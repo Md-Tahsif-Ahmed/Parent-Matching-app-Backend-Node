@@ -14,11 +14,7 @@ export default{
         jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
         jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN
     },
-    stripe:{
-        stripeSecretKey:process.env.STRIPE_API_SECRET,
-        webhookSecret:process.env.WEBHOOK_SECRET,
-        paymentSuccess:process.env.WEBHOOK_SECRET
-    },
+ 
     email:{
         from: process.env.EMAIL_FROM,
         user: process.env.EMAIL_USER,
@@ -26,12 +22,7 @@ export default{
         host: process.env.EMAIL_HOST,
         pass: process.env.EMAIL_PASS
     },
-    social: {
-        google_client_id: process.env.GOOGLE_CLIENT_ID,
-        facebook_client_id: process.env.FACEBOOK_CLIENT_ID,
-        google_client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        facebook_client_secret: process.env.FACEBOOK_CLIENT_SECRET
-    },
+
     admin: {
         email:process.env.ADMIN_EMAIL,
         password: process.env.ADMIN_PASSWORD

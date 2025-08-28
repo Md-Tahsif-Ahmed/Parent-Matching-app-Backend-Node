@@ -14,5 +14,4 @@ export const checkValidID = (fieldName: string) =>
         },
         {
             message:`${fieldName}`,
-        }
-    );
+        }    );
