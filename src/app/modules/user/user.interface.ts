@@ -1,13 +1,6 @@
 import { Model, Types } from 'mongoose';
 import { USER_ROLES } from '../../../enums/user';
 
-interface IStripeAccountInfo {
-    status: string;
-    stripeAccountId: string;
-    externalAccountId: string;
-    currency: string;
-}
-
 interface IAuthenticationProps {
     isResetPassword: boolean;
     oneTimeCode: number;
@@ -25,7 +18,6 @@ export type IUser = {
     profile: string;
     verified: boolean;
     authentication?: IAuthenticationProps;
-    accountInformation?: IStripeAccountInfo;
 }
 
 export type UserModal = {

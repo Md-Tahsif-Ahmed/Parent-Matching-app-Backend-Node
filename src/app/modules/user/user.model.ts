@@ -66,21 +66,7 @@ const userSchema = new Schema<IUser, UserModal>(
             },
             select: 0
         },
-        accountInformation: {
-            status: {
-              type: Boolean,
-                default: false,
-            },
-            stripeAccountId: {
-                type: String,
-            },
-            externalAccountId: {
-                type: String,
-            },
-            currency: {
-                type: String,
-            }
-        }
+       
     },
     {
         timestamps: true
