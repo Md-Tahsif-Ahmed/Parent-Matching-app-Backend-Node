@@ -27,7 +27,7 @@ router
     .patch(
         auth(USER_ROLES.ADMIN, USER_ROLES.USER),
         fileUploadHandler(),
-        UserController.updateProfile
+        UserController.updateUser
     );
 
 export const UserRoutes = router;

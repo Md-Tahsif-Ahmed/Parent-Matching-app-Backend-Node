@@ -1,73 +1,59 @@
-import { NextFunction, Request, Response } from 'express';
+// src/app/modules/user/user.controller.ts
+import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { UserService } from './user.service';
 import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
+import { UserService } from './user.service';
 
-// register user
-const createUser = catchAsync( async (req: Request, res: Response, next: NextFunction) => {
-    const { ...userData } = req.body;
-    const result = await UserService.createUserToDB(userData);
-
-    sendResponse(res, {
-        success: true,
-        statusCode: StatusCodes.OK,
-        message: 'Your account has been successfully created. Verify Your Email By OTP. Check your email',
-    })
-});
-
-// register admin
-const createAdmin = catchAsync( async (req: Request, res: Response, next: NextFunction) => {
-    const { ...userData } = req.body;
-    const result = await UserService.createAdminToDB(userData);
-
-    sendResponse(res, {
-        success: true,
-        statusCode: StatusCodes.OK,
-        message: 'Admin created successfully',
-        data: result
-    });
-});
-
-// retrieved user profile
+// GET /users/me
 const getUserProfile = catchAsync(async (req: Request, res: Response) => {
-    const user = req.user;
-    const result = await UserService.getUserProfileFromDB(user);
-
-    sendResponse(res, {
-        success: true,
-        statusCode: StatusCodes.OK,
-        message: 'Profile data retrieved successfully',
-        data: result
-    });
+  const result = await UserService.getMyProfileFromDB((req as any).user.id);
+  return sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: 'User profile fetched',
+    data: result,
+  });
 });
 
-//update profile
-const updateProfile = catchAsync( async (req: Request, res: Response, next: NextFunction) => {
-    const user = req.user;
-    
-    let profile;
-    if (req.files && 'image' in req.files && req.files.image[0]) {
-        profile = `/images/${req.files.image[0].filename}`;
-    }
-
-    const data = {
-        profile,
-        ...req.body,
-    };
-    const result = await UserService.updateProfileToDB(user, data);
-
-    sendResponse(res, {
-        success: true,
-        statusCode: StatusCodes.OK,
-        message: 'Profile updated successfully',
-        data: result
-    });
+// POST /users
+const createUser = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserService.createUserToDB(req.body);
+  return sendResponse(res, {
+    statusCode: StatusCodes.CREATED,
+    success: true,
+    message: 'Your account has been created. Please verify your email with the OTP.',
+    data: result,
+  });
 });
 
-export const UserController = { 
-    createUser, 
-    createAdmin, 
-    getUserProfile, 
-    updateProfile
+// POST /users/admin
+const createAdmin = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserService.createAdminToDB(req.body);
+  return sendResponse(res, {
+    statusCode: StatusCodes.CREATED,
+    success: true,
+    message: 'Admin created successfully',
+    data: result,
+  });
+});
+
+// PATCH /users/me
+const updateUser = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserService.updateUserFromDB((req as any).user.id, req.body);
+  return sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: 'User updated successfully',
+    data: result,
+  });
+});
+
+
+// --- aggregated object export (তোমার চাওয়া স্টাইলে) ---
+export const UserController = {
+  getUserProfile,
+  createUser,
+  createAdmin,
+  updateUser,
 };

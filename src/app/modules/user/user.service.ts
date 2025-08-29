@@ -1,97 +1,102 @@
-import { USER_ROLES } from "../../../enums/user";
-import { IUser } from "./user.interface";
-import { JwtPayload } from 'jsonwebtoken';
-import { User } from "./user.model";
-import { StatusCodes } from "http-status-codes";
-import ApiError from "../../../errors/ApiErrors";
-import generateOTP from "../../../util/generateOTP";
-import { emailTemplate } from "../../../shared/emailTemplate";
-import { emailHelper } from "../../../helpers/emailHelper";
-import unlinkFile from "../../../shared/unlinkFile";
+import { Types } from 'mongoose';
+import { StatusCodes } from 'http-status-codes';
+import ApiError from '../../../errors/ApiErrors';
 
-const createAdminToDB = async (payload: any): Promise<IUser> => {
+import { USER_ROLES } from '../../../enums/user';
+import { IUser } from './user.interface';
+import { User } from './user.model';
 
-    // check admin is exist or not;
-    const isExistAdmin = await User.findOne({ email: payload.email })
-    if (isExistAdmin) {
-        throw new ApiError(StatusCodes.CONFLICT, "This Email already taken");
-    }
+import generateOTP from '../../../util/generateOTP';
+import { emailTemplate } from '../../../shared/emailTemplate';
+import { emailHelper } from '../../../helpers/emailHelper';
 
-    // create admin to db
-    const createAdmin = await User.create(payload);
-    if (!createAdmin) {
-        throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create Admin');
-    } else {
-        await User.findByIdAndUpdate({ _id: createAdmin?._id }, { verified: true }, { new: true });
-    }
+const createUserToDB = async (payload: Partial<IUser>) => {
+  // Optional nice 409 instead of raw E11000
+  if (payload.email) {
+    const exists = await User.isExistUserByEmail(payload.email);
+    if (exists) throw new ApiError(StatusCodes.CONFLICT, 'Email already taken');
+  }
 
-    return createAdmin;
-}
+  const user = new User({
+    firstName: payload.firstName,
+    lastName: payload.lastName,
+    dob: payload.dob ? new Date(payload.dob as any) : undefined,
+    email: payload.email,
+    password: payload.password,
+    name: payload.name,
+  });
+  await user.save();
 
-const createUserToDB = async (payload: Partial<IUser>): Promise<IUser> => {
+  // --- OTP + Email (from Method-1) ---
+  const otp = generateOTP(); // e.g., 6-digit
+  // ensure name is a string (fallback to email if name is undefined)
+  const values = { name: user.name ?? user.email!, otp, email: user.email! };
 
-    const createUser = await User.create(payload);
-    if (!createUser) {
-        throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create user');
-    }
+  // if sendEmail returns a Promise, we await so failures bubble up
+  await emailHelper.sendEmail(emailTemplate.createAccount(values));
 
-    //send email
-    const otp = generateOTP();
-    const values = {
-        name: createUser.name,
-        otp: otp,
-        email: createUser.email!
-    };
-
-    const createAccountTemplate = emailTemplate.createAccount(values);
-    emailHelper.sendEmail(createAccountTemplate);
-
-    //save to DB
-    const authentication = {
+  // save OTP to DB (note: for production, hash the OTP)
+  await User.findByIdAndUpdate(user._id, {
+    $set: {
+      authentication: {
         oneTimeCode: otp,
-        expireAt: new Date(Date.now() + 3 * 60000),
-    };
+        expireAt: new Date(Date.now() + 3 * 60_000), // 3 minutes
+        isResetPassword: false,
+      },
+      verified: false,
+    },
+  });
 
-    await User.findOneAndUpdate(
-        { _id: createUser._id },
-        { $set: { authentication } }
-    );
-
-    return createUser;
+  return await User.findById(user._id).populate('profile');
 };
 
-const getUserProfileFromDB = async (user: JwtPayload): Promise<Partial<IUser>> => {
-    const { id } = user;
-    const isExistUser: any = await User.isExistUserById(id);
-    if (!isExistUser) {
-        throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
-    }
-    return isExistUser;
+const createAdminToDB = async (payload: Partial<IUser>) => {
+  if (!payload.email || !payload.password) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Email and password required');
+  }
+
+  const exists = await User.isExistUserByEmail(payload.email);
+  if (exists) throw new ApiError(StatusCodes.CONFLICT, 'This email already taken');
+
+  const user = new User({
+    email: payload.email,
+    password: payload.password,
+    name: payload.name,
+    role: USER_ROLES.ADMIN,
+    verified: true,
+  } as any);
+
+  await user.save();
+  return await User.findById(user._id);
 };
 
-const updateProfileToDB = async (user: JwtPayload, payload: Partial<IUser>): Promise<Partial<IUser | null>> => {
-    const { id } = user;
-    const isExistUser = await User.isExistUserById(id);
-    if (!isExistUser) {
-        throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
-    }
+const getMyProfileFromDB = async (userId: string | Types.ObjectId) => {
+  const doc = await User.findById(userId).populate('profile');
+  if (!doc) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
+  return doc;
+};
 
-    //unlink file here
-    if (payload.profile) {
-        unlinkFile(isExistUser.profile);
-    }
+const updateUserFromDB = async (userId: string, payload: Partial<IUser>) => {
+  const allowed: Partial<IUser> = {
+    name: payload.name,
+    firstName: payload.firstName,
+    lastName: payload.lastName,
+    dob: payload.dob ? new Date(payload.dob as any) : undefined,
+  };
 
-    const updateDoc = await User.findOneAndUpdate(
-        { _id: id },
-        payload,
-        { new: true }
-    );
-    return updateDoc;
+  const updated = await User.findByIdAndUpdate(
+    userId,
+    { $set: allowed },
+    { new: true }
+  ).populate('profile');
+
+  if (!updated) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
+  return updated;
 };
 
 export const UserService = {
-    createUserToDB,
-    getUserProfileFromDB,
-    updateProfileToDB,
-    createAdminToDB
+  createUserToDB,
+  createAdminToDB,
+  getMyProfileFromDB,
+  updateUserFromDB,
 };

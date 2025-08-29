@@ -1,12 +1,46 @@
 import { z } from 'zod';
+import { USER_ROLES } from '../../../enums/user';
 
-const createAdminZodSchema = z.object({
-    body: z.object({
-        name: z.string({ required_error: 'Name is required' }),
-        email: z.string({ required_error: 'Email is required' }).email({ message: 'Invalid email address' }),
-        password: z.string({ required_error: 'Password is required' }),
-        role: z.string({ required_error: 'Role is required' })
-    })
+const createUserZodSchema = z.object({
+  body: z.object({
+    firstName: z.string().trim().optional(),
+    lastName:  z.string().trim().optional(),
+    name:      z.string().trim().optional(),        
+    email:     z.string().email(),
+    password:  z.string().min(8),
+    dob:       z.string().refine((val) => !isNaN(Date.parse(val)), {
+                  message: "Invalid date format",
+               }).optional(),
+    role:      z.nativeEnum(USER_ROLES).optional() 
+  }),
+});
+ 
+const updateProfileZodSchema = z.object({
+  body: z.object({
+    firstName: z.string().trim().optional(),
+    lastName:  z.string().trim().optional(),
+    name:      z.string().trim().optional(),
+    dob:       z.string().optional(),
+ 
+  })
 });
 
-export const UserValidation = { createAdminZodSchema };  
+const createAdminZodSchema = z.object({
+  body: z.object({
+    firstName: z.string().trim().optional(),
+    lastName:  z.string().trim().optional(),
+    name:      z.string().trim().optional(),        
+    email:     z.string().email(),
+    password:  z.string().min(8),
+    dob:       z.string().refine((val) => !isNaN(Date.parse(val)), {
+                  message: "Invalid date format",
+               }).optional(),
+    role:      z.nativeEnum(USER_ROLES)
+  }),
+});
+
+export const UserValidation = {
+  createUserZodSchema,
+  updateProfileZodSchema,
+  createAdminZodSchema,
+};
