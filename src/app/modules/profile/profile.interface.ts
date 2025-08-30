@@ -1,23 +1,29 @@
 import { Document, Types } from 'mongoose';
 
 export interface ISimpleKV {
-  typeName?: string;
-  name: string;
+  typeName?: string;   // dropdown group (optional)
+  name: string;        // dropdown item OR free-text when "Others"
 }
 
 export interface IGeoPoint {
   type: 'Point';
-  coordinates: [number, number];
+  coordinates: [number, number]; // [lng, lat]
+}
+
+export interface IFileMeta {
+  url: string;
+  mime?: string;
+  size?: number;
 }
 
 export interface IProfile extends Document {
   user: Types.ObjectId;
-  displayName?: string;
-  aboutMe?: string;
-  childAge?: number;
 
-  profilePicture?: { url: string; mime?: string; size?: number };
-  galleryPhotos?: Array<{ url: string; mime?: string; size?: number }>;
+  aboutMe?: string;
+  childAge?: number; // store in months (recommended)
+
+  profilePicture?: IFileMeta;
+  galleryPhotos?: IFileMeta[];
 
   location?: IGeoPoint;
   locationText?: string;
@@ -29,7 +35,7 @@ export interface IProfile extends Document {
   diagnoses: ISimpleKV[];
   therapies: ISimpleKV[];
 
-  completion?: number;
+  completion?: number;  // onboarding progress (0-100)
   consentAt?: Date;
 
   createdAt: Date;

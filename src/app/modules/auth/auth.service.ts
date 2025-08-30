@@ -108,6 +108,82 @@ const verifyEmailToDB = async (payload: IVerifyEmail) => {
   };
 };
 
+
+// ..............................
+// const verifyEmailToDB = async (payload: IVerifyEmail) => {
+//   const { email } = payload;
+//   const code = String(payload.oneTimeCode); // normalize
+//   const user: any = await User.findOne({ email }).select('+authentication');
+//   if (!user) throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
+//   if (!code) throw new ApiError(StatusCodes.BAD_REQUEST, 'Please provide the OTP code');
+
+//   const auth = user.authentication || {};
+//   if (String(auth.oneTimeCode) !== code) {
+//     throw new ApiError(StatusCodes.BAD_REQUEST, 'You provided wrong otp');
+//   }
+//   if (!auth.expireAt || new Date() > new Date(auth.expireAt)) {
+//     throw new ApiError(StatusCodes.BAD_REQUEST, 'Otp already expired, Please try again');
+//   }
+
+//   // ----- RESET PASSWORD FLOW -----
+//   if (auth.isResetPassword === true) {
+//     const resetToken = cryptoToken();
+//     await ResetToken.create({
+//       user: user._id,
+//       token: resetToken,
+//       expireAt: new Date(Date.now() + ((((config as any).auth?.resetTokenExpireMin) || 10) * 60000)),
+//     });
+//     await User.findByIdAndUpdate(user._id, {
+//       authentication: { isResetPassword: false, oneTimeCode: null, expireAt: null },
+//     });
+//     return {
+//       success: true,
+//       message: 'Verification successful for reset password',
+//       data: { resetToken, next: 'RESET_PASSWORD' },
+//     };
+//   }
+
+//   // ----- FIRST-TIME EMAIL VERIFY (SIGNUP) -----
+//   if (user.verified !== true) {
+//     await User.findByIdAndUpdate(user._id, {
+//       verified: true,
+//       authentication: { isResetPassword: false, oneTimeCode: null, expireAt: null },
+//     });
+
+//     await Profile.findOneAndUpdate(
+//       { user: user._id },
+//       { $setOnInsert: { user: user._id, completion: 0 } },
+//       { upsert: true, new: true }
+//     );
+
+//     const accessToken = jwtHelper.createToken(
+//       { id: user._id, role: user.role, email: user.email },
+//       config.jwt.jwt_secret as Secret,
+//       config.jwt.jwt_expire_in as string
+//     );
+//     const refreshToken = jwtHelper.createToken(
+//       { id: user._id, role: user.role, email: user.email },
+//       config.jwt.jwtRefreshSecret as Secret,
+//       config.jwt.jwtRefreshExpiresIn as string
+//     );
+
+//     return {
+//       success: true,
+//       message: 'Email verified successfully',
+//       data: { accessToken, refreshToken, next: 'ONBOARDING' },
+//     };
+//   }
+
+//   // ----- ALREADY VERIFIED (NOT A RESET OTP) -----
+//   return {
+//     success: true,
+//     message: 'Email already verified',
+//     data: { next: 'HOME' },
+//   };
+// };
+
+// ..............................
+
 const resetPasswordToDB = async (token: string, payload: IAuthResetPassword) => {
   const { newPassword, confirmPassword } = payload;
   const isExistToken = await ResetToken.isExistToken(token);

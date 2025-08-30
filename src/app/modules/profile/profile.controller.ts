@@ -1,3 +1,4 @@
+// profile.controller.ts
 import { Request, Response } from 'express';
 import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
@@ -13,13 +14,25 @@ const me = catchAsync(async (req: Request, res: Response) => {
     data: profile,
   });
 });
-
-const updateBasic = catchAsync(async (req: Request, res: Response) => {
-  const profile = await ProfileService.updateBasic(req.user.id, req.body);
+ 
+// NEW: aboutMe only
+const setAboutMe = catchAsync(async (req: Request, res: Response) => {
+  const profile = await ProfileService.setAboutMe(req.user.id, req.body.aboutMe);
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Basic info updated',
+    message: 'About me updated',
+    data: profile,
+  });
+});
+
+// NEW: childAge only
+const setChildAge = catchAsync(async (req: Request, res: Response) => {
+  const profile = await ProfileService.setChildAge(req.user.id, req.body.childAge);
+  return sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: 'Child age updated',
     data: profile,
   });
 });
@@ -139,7 +152,8 @@ const deletePhoto = catchAsync(async (req: Request, res: Response) => {
 
 export const ProfileController = {
   me,
-  updateBasic,
+  setAboutMe,    // NEW
+  setChildAge,   // NEW
   setJourney,
   setInterestsValues,
   setDiagnoses,

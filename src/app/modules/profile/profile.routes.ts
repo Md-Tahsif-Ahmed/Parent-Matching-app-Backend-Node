@@ -1,3 +1,4 @@
+// profile.routes.ts
 import express from 'express';
 import auth from '../../middlewares/auth';
 import { USER_ROLES } from '../../../enums/user';
@@ -12,9 +13,16 @@ router.use(auth(USER_ROLES.ADMIN, USER_ROLES.SUPER_ADMIN, USER_ROLES.USER));
 
 router.get('/me', ProfileController.me);
 
-router.patch('/basic',
-  validateRequest(ProfileValidation.updateBasic),
-  ProfileController.updateBasic
+
+// NEW: dedicated routes
+router.patch('/about-me',
+  validateRequest(ProfileValidation.setAboutMe),
+  ProfileController.setAboutMe
+);
+
+router.patch('/child-age',
+  validateRequest(ProfileValidation.setChildAge),
+  ProfileController.setChildAge
 );
 
 router.put('/journey',

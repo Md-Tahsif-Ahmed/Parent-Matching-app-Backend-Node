@@ -1,50 +1,75 @@
-import { Schema, model, Types } from 'mongoose';
+import { Schema, model } from 'mongoose';
+import { IProfile, IGeoPoint, ISimpleKV, IFileMeta } from './profile.interface';
 
-const GeoPointSchema = new Schema(
+// ---------- Sub-schemas ----------
+const GeoPointSchema = new Schema<IGeoPoint>(
   {
     type: { type: String, enum: ['Point'], default: 'Point' },
-    coordinates: { type: [Number], required: true }, // [lng, lat]
+    coordinates: {
+      type: [Number],
+      required: true, // [lng, lat]
+      validate: {
+        validator: (v: number[]) => Array.isArray(v) && v.length === 2,
+        message: 'coordinates must be [lng, lat]',
+      },
+    },
   },
   { _id: false }
 );
 
-const max4 = (arr: any[]) => !arr || arr.length <= 4;
-
-const SimpleKVSchema = new Schema(
+const SimpleKVSchema = new Schema<ISimpleKV>(
   {
-    typeName: { type: String },   // dropdown group (optional)
-    name:     { type: String, required: true }, // dropdown item OR free-text when Others
+    typeName: { type: String },
+    name: { type: String, required: true },
   },
   { _id: false }
 );
 
-const ProfileSchema = new Schema(
+const FileMetaSchema = new Schema<IFileMeta>(
   {
-    user: { type: Types.ObjectId, ref: 'User', unique: true, required: true },
+    url: { type: String, required: true },
+    mime: { type: String },
+    size: { type: Number },
+  },
+  { _id: false }
+);
 
-    displayName: { type: String },
-    aboutMe:     { type: String },
-    childAge:    { type: Number }, // months or years (decide in FE)
+// gallery limit validator
+const max4 = (arr: unknown[]) => !arr || arr.length <= 4;
 
-    profilePicture: { type: Object },  // snapshot of {url,mime,size}
-    galleryPhotos:  { type: [Object], default: [], validate: [max4, 'Gallery can contain at most 4 photos'] },
+// ---------- Main schema ----------
+const ProfileSchema = new Schema<IProfile>(
+  {
+    user: { type: Schema.Types.ObjectId, ref: 'User', unique: true, required: true },
 
-    location:     { type: GeoPointSchema },
-    locationText: { type: String },
+    aboutMe: { type: String, trim: true },
+    childAge: { type: Number }, // months or years (decide in FE; recommend months)
 
-    journeyName:  { type: String },
-    interests:    { type: [String], default: [] },
-    values:       { type: [String], default: [] },
+    profilePicture: { type: FileMetaSchema },
+    galleryPhotos: {
+      type: [FileMetaSchema],
+      default: [],
+      validate: [max4, 'Gallery can contain at most 4 photos'],
+    },
 
-    diagnoses:    { type: [SimpleKVSchema], default: [] },
-    therapies:    { type: [SimpleKVSchema], default: [] },
+    location: { type: GeoPointSchema },
+    locationText: { type: String, trim: true },
 
-    completion:   { type: Number, default: 0 },   // onboarding progress (0-100)
-    consentAt:    { type: Date },                 // "I understand & agree"
+    journeyName: { type: String, trim: true },
+    interests: { type: [String], default: [] },
+    values: { type: [String], default: [] },
+
+    diagnoses: { type: [SimpleKVSchema], default: [] },
+    therapies: { type: [SimpleKVSchema], default: [] },
+
+    completion: { type: Number, default: 0 }, // 0–100
+    consentAt: { type: Date },
   },
   { timestamps: true }
 );
 
+// geo index for location queries
 ProfileSchema.index({ location: '2dsphere' });
 
-export const Profile = model('Profile', ProfileSchema);
+// ---------- Model ----------
+export const Profile = model<IProfile>('Profile', ProfileSchema);

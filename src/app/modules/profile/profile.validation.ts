@@ -1,3 +1,4 @@
+// profile.validation.ts
 import { z } from 'zod';
 
 const itemsSchema = z.object({
@@ -10,11 +11,20 @@ const itemsSchema = z.object({
 });
 
 export const ProfileValidation = {
-  updateBasic: z.object({
+ 
+
+  // NEW: aboutMe only
+  setAboutMe: z.object({
     body: z.object({
-      displayName: z.string().trim().min(1).optional(),
-      aboutMe: z.string().trim().max(2000).optional(),
-      childAge: z.number().int().min(0).max(600).optional(),
+      // খালি string দিলে clear করার সুযোগ রাখতে min(0)
+      aboutMe: z.string().max(2000),
+    }),
+  }),
+
+  // NEW: childAge only
+  setChildAge: z.object({
+    body: z.object({
+      childAge: z.number().int().min(0).max(600),
     }),
   }),
 
@@ -31,9 +41,8 @@ export const ProfileValidation = {
     }).refine((b) => !!b.interests || !!b.values, { message: 'Provide interests or values' }),
   }),
 
-  setDiagnoses: z.object({ body: itemsSchema.shape }),
-
-  setTherapies: z.object({ body: itemsSchema.shape }),
+  setDiagnoses: z.object({ body: itemsSchema }),
+  setTherapies: z.object({ body: itemsSchema }),
 
   setLocation: z.object({
     body: z.object({

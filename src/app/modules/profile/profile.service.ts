@@ -1,3 +1,4 @@
+// profile.service.ts
 import { Types } from 'mongoose';
 import ApiError from '../../../errors/ApiErrors';
 import { StatusCodes } from 'http-status-codes';
@@ -8,10 +9,7 @@ type UserId = string | Types.ObjectId;
 const pickUrlFromFile = (file?: any): { url: string; mime?: string; size?: number } => {
   if (!file) throw new ApiError(StatusCodes.BAD_REQUEST, 'File is required');
   const url =
-    file.location ||
-    file.path ||
-    file.secure_url ||
-    (file.filename ? `/uploads/${file.filename}` : null);
+    file.location || file.path || file.secure_url || (file.filename ? `/uploads/${file.filename}` : null);
   if (!url) throw new ApiError(StatusCodes.BAD_REQUEST, 'Unable to resolve upload URL');
   return { url, mime: file.mimetype, size: file.size };
 };
@@ -26,13 +24,23 @@ const me = async (userId: UserId) => {
   return await Profile.findOne({ user: userId });
 };
 
-const updateBasic = async (
-  userId: UserId,
-  payload: Partial<{ displayName: string; aboutMe: string; childAge: number }>
-) => {
+ 
+
+// NEW: aboutMe only
+const setAboutMe = async (userId: UserId, aboutMe: string) => {
   const p = await Profile.findOneAndUpdate(
     { user: userId },
-    { $set: payload },
+    { $set: { aboutMe: aboutMe?.trim?.() ?? '' } },
+    { new: true, upsert: true }
+  );
+  return p;
+};
+
+// NEW: childAge only
+const setChildAge = async (userId: UserId, childAge: number) => {
+  const p = await Profile.findOneAndUpdate(
+    { user: userId },
+    { $set: { childAge } },
     { new: true, upsert: true }
   );
   return p;
@@ -59,10 +67,7 @@ const setInterestsValues = async (userId: UserId, interests?: string[], values?:
   return p;
 };
 
-const setDiagnoses = async (
-  userId: UserId,
-  items: Array<{ typeName?: string; name: string }>
-) => {
+const setDiagnoses = async (userId: UserId, items: Array<{ typeName?: string; name: string }>) => {
   const bad = items.find(it => !it.name || it.name.trim().length === 0);
   if (bad) throw new ApiError(StatusCodes.BAD_REQUEST, 'Each diagnosis must contain a name');
   const p = await Profile.findOneAndUpdate(
@@ -73,10 +78,7 @@ const setDiagnoses = async (
   return p;
 };
 
-const setTherapies = async (
-  userId: UserId,
-  items: Array<{ typeName?: string; name: string }>
-) => {
+const setTherapies = async (userId: UserId, items: Array<{ typeName?: string; name: string }>) => {
   const bad = items.find(it => !it.name || it.name.trim().length === 0);
   if (bad) throw new ApiError(StatusCodes.BAD_REQUEST, 'Each therapy must contain a name');
   const p = await Profile.findOneAndUpdate(
@@ -87,12 +89,7 @@ const setTherapies = async (
   return p;
 };
 
-const setLocation = async (
-  userId: UserId,
-  lat: number,
-  lng: number,
-  locationText?: string
-) => {
+const setLocation = async (userId: UserId, lat: number, lng: number, locationText?: string) => {
   const update: any = {
     location: { type: 'Point', coordinates: [lng, lat] },
   };
@@ -130,7 +127,8 @@ const addPhoto = async (userId: UserId, file: any) => {
   if ((p.galleryPhotos?.length || 0) >= 4) {
     throw new ApiError(StatusCodes.CONFLICT, 'PHOTO_LIMIT_REACHED');
   }
-  p.galleryPhotos = [...(p.galleryPhotos || []), media];
+  if (!p.galleryPhotos) p.galleryPhotos = [] as any;
+  (p.galleryPhotos as any).push(media);
   await p.save();
   return p;
 };
@@ -141,7 +139,7 @@ const replacePhoto = async (userId: UserId, index: number, file: any) => {
   if (!p.galleryPhotos || index < 0 || index >= p.galleryPhotos.length) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid photo index');
   }
-  p.galleryPhotos[index] = media;
+  (p.galleryPhotos as any)[index] = media;
   await p.save();
   return p;
 };
@@ -158,7 +156,8 @@ const deletePhoto = async (userId: UserId, index: number) => {
 
 export const ProfileService = {
   me,
-  updateBasic,
+  setAboutMe,
+  setChildAge,
   setJourney,
   setInterestsValues,
   setDiagnoses,
