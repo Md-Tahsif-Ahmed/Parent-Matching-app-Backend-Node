@@ -3,16 +3,12 @@ import { Types } from 'mongoose';
 import ApiError from '../../../errors/ApiErrors';
 import { StatusCodes } from 'http-status-codes';
 import { Profile } from './profile.model';
+import unlinkFile from '../../../shared/unlinkFile';
+import { IFileMeta, IProfile } from './profile.interface';
 
 type UserId = string | Types.ObjectId;
 
-const pickUrlFromFile = (file?: any): { url: string; mime?: string; size?: number } => {
-  if (!file) throw new ApiError(StatusCodes.BAD_REQUEST, 'File is required');
-  const url =
-    file.location || file.path || file.secure_url || (file.filename ? `/uploads/${file.filename}` : null);
-  if (!url) throw new ApiError(StatusCodes.BAD_REQUEST, 'Unable to resolve upload URL');
-  return { url, mime: file.mimetype, size: file.size };
-};
+ 
 
 const requireProfile = async (userId: UserId) => {
   const profile = await Profile.findOne({ user: userId });
@@ -111,47 +107,153 @@ const setConsent = async (userId: UserId) => {
   return p;
 };
 
-const uploadProfilePicture = async (userId: UserId, file: any) => {
-  const media = pickUrlFromFile(file);
-  const p = await Profile.findOneAndUpdate(
-    { user: userId },
-    { $set: { profilePicture: media } },
-    { new: true, upsert: true }
-  );
-  return p;
+const uploadProfilePicture = async (
+  userId: UserId,
+  file: Express.Multer.File
+): Promise<IProfile> => {
+  if (!file) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'File is required (key: "image")');
+  }
+
+  // new file meta from multer
+  const newMeta: IFileMeta = {
+    url: `/images/${file.filename}`,
+    mime: file.mimetype,
+    size: file.size,
+  };
+
+  // user profile খুঁজে বের করো (না থাকলে তৈরি করো)
+  let profile = await Profile.findOne({ user: userId });
+
+  if (!profile) {
+    profile = await Profile.create({
+      user: userId,
+      profilePicture: newMeta,
+    } as Partial<IProfile>);
+    return profile;
+  }
+
+  // আগে যদি profilePicture থেকে থাকে—ফাইল unlink করো
+  if (profile.profilePicture?.url) {
+    unlinkFile(profile.profilePicture.url); // leading slash handle করে এমন unlinkFile ব্যবহার করো
+  }
+
+  profile.profilePicture = newMeta;
+  await profile.save();
+
+  return profile;
 };
 
-const addPhoto = async (userId: UserId, file: any) => {
-  const media = pickUrlFromFile(file);
-  const p = await requireProfile(userId);
-  if ((p.galleryPhotos?.length || 0) >= 4) {
+const addPhoto = async (userId: UserId, file: Express.Multer.File): Promise<IProfile> => {
+  if (!file) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'File is required (key: "image")');
+  }
+
+  const newMeta: IFileMeta = {
+    url: `/images/${file.filename}`,
+    mime: file.mimetype,
+    size: file.size,
+  };
+
+  // find or create profile
+  let profile = await Profile.findOne({ user: userId });
+  if (!profile) {
+    profile = await Profile.create({
+      user: userId,
+      galleryPhotos: [newMeta],
+    } as Partial<IProfile>);
+    return profile;
+  }
+
+  if ((profile.galleryPhotos?.length || 0) >= 4) {
     throw new ApiError(StatusCodes.CONFLICT, 'PHOTO_LIMIT_REACHED');
   }
-  if (!p.galleryPhotos) p.galleryPhotos = [] as any;
-  (p.galleryPhotos as any).push(media);
-  await p.save();
-  return p;
+  if (!profile.galleryPhotos) profile.galleryPhotos = [] as any;
+  (profile.galleryPhotos as any).push(newMeta);
+  await profile.save();
+  return profile;
 };
 
-const replacePhoto = async (userId: UserId, index: number, file: any) => {
-  const media = pickUrlFromFile(file);
-  const p = await requireProfile(userId);
-  if (!p.galleryPhotos || index < 0 || index >= p.galleryPhotos.length) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid photo index');
+const addPhotos = async (userId: UserId, files: Express.Multer.File[]): Promise<IProfile> => {
+  if (!files || files.length === 0) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Files are required (key: "image")');
   }
-  (p.galleryPhotos as any)[index] = media;
-  await p.save();
-  return p;
+
+  // map to IFileMeta
+  const metas: IFileMeta[] = files.map(f => ({
+    url: `/images/${f.filename}`,
+    mime: f.mimetype,
+    size: f.size,
+  }));
+
+  // find or create profile
+  let profile = await Profile.findOne({ user: userId });
+  if (!profile) {
+    if (metas.length > 4) {
+      throw new ApiError(StatusCodes.CONFLICT, 'PHOTO_LIMIT_REACHED');
+    }
+    profile = await Profile.create({
+      user: userId,
+      galleryPhotos: metas,
+    } as Partial<IProfile>);
+    return profile;
+  }
+
+  const existingCount = (profile.galleryPhotos?.length || 0);
+  if (existingCount + metas.length > 4) {
+    throw new ApiError(StatusCodes.CONFLICT, 'PHOTO_LIMIT_REACHED');
+  }
+
+  if (!profile.galleryPhotos) profile.galleryPhotos = [] as any;
+  (profile.galleryPhotos as IFileMeta[]).push(...metas);
+  await profile.save();
+  return profile;
 };
 
-const deletePhoto = async (userId: UserId, index: number) => {
-  const p = await requireProfile(userId);
-  if (!p.galleryPhotos || index < 0 || index >= p.galleryPhotos.length) {
+// replace photo at index with uploaded file
+const replacePhoto = async (userId: UserId, index: number, file: Express.Multer.File): Promise<IProfile> => {
+  if (!file) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'File is required (key: "image")');
+  }
+
+  const newMeta: IFileMeta = {
+    url: `/images/${file.filename}`,
+    mime: file.mimetype,
+    size: file.size,
+  };
+
+  const profile = await requireProfile(userId);
+
+  if (!profile.galleryPhotos || index < 0 || index >= profile.galleryPhotos.length) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid photo index');
   }
-  p.galleryPhotos.splice(index, 1);
-  await p.save();
-  return p;
+
+  // unlink existing file if present
+  const old = profile.galleryPhotos[index];
+  if (old?.url) {
+    try { unlinkFile(old.url); } catch (e) { /* non-fatal, continue */ }
+  }
+
+  (profile.galleryPhotos as any)[index] = newMeta;
+  await profile.save();
+  return profile;
+};
+
+// delete photo at index and unlink file
+const deletePhoto = async (userId: UserId, index: number): Promise<IProfile> => {
+  const profile = await requireProfile(userId);
+
+  if (!profile.galleryPhotos || index < 0 || index >= profile.galleryPhotos.length) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid photo index');
+  }
+
+  const [removed] = profile.galleryPhotos.splice(index, 1);
+  if (removed?.url) {
+    try { unlinkFile(removed.url); } catch (e) { /* non-fatal, continue */ }
+  }
+
+  await profile.save();
+  return profile;
 };
 
 export const ProfileService = {
@@ -166,6 +268,7 @@ export const ProfileService = {
   setConsent,
   uploadProfilePicture,
   addPhoto,
+  addPhotos,
   replacePhoto,
   deletePhoto,
 };

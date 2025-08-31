@@ -3,9 +3,9 @@ import express from 'express';
 import auth from '../../middlewares/auth';
 import { USER_ROLES } from '../../../enums/user';
 import validateRequest from '../../middlewares/validateRequest';
-import fileUploadHandler from '../../middlewares/fileUploaderHandler';
 import { ProfileController } from './profile.controller';
 import { ProfileValidation } from './profile.validation';
+import { uploadSingleImage, uploadFieldsImage } from '../../middlewares/fileUploaderHandler';
 
 const router = express.Router();
 
@@ -57,24 +57,27 @@ router.post('/consent',
 
 // media
 router.put('/profile-picture',
-  fileUploadHandler(),
+  uploadSingleImage(),
   ProfileController.uploadProfilePicture
 );
 
 router.post('/photos',
-  fileUploadHandler(),
+  uploadFieldsImage(),
   ProfileController.addPhoto
 );
 
+// replace single gallery photo at index (accepts one file)
 router.put('/photos/:index',
   validateRequest(ProfileValidation.replacePhoto),
-  fileUploadHandler(),
+  uploadSingleImage(),
   ProfileController.replacePhoto
 );
 
+// remove photo at index
 router.delete('/photos/:index',
   validateRequest(ProfileValidation.deletePhoto),
   ProfileController.deletePhoto
 );
+
 
 export const ProfileRoutes = router;

@@ -69,10 +69,23 @@ const fileUploadHandler = () => {
         }
     };
 
-    const upload = multer({ storage: storage, fileFilter: filterFilter})
-    .fields([{ name: 'image', maxCount: 3 } ]);
-    return upload;
+    // create a multer instance so we can build different middlewares (single/fields)
+    const multerInstance = multer({ storage: storage, fileFilter: filterFilter });
+
+    // default: fields middleware (keeps backward compatibility)
+    // allow up to 4 files for the "image" field (gallery uploads)
+    const fieldsUpload = multerInstance.fields([{ name: 'image', maxCount: 4 } ]);
+
+    // single middleware for routes that expect req.file
+    const singleUpload = multerInstance.single('image');
+
+    return { fieldsUpload, singleUpload };
 
 };
 
-export default fileUploadHandler;
+const handler = fileUploadHandler();
+
+export const uploadSingleImage = () => handler.singleUpload;
+export const uploadFieldsImage = () => handler.fieldsUpload;
+
+export default uploadFieldsImage;

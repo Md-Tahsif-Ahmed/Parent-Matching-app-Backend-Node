@@ -3,7 +3,9 @@ import { Request, Response } from 'express';
 import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
 import { StatusCodes } from 'http-status-codes';
+
 import { ProfileService } from './profile.service';
+import ApiError from '../../../errors/ApiErrors';
 
 const me = catchAsync(async (req: Request, res: Response) => {
   const profile = await ProfileService.me(req.user.id);
@@ -106,18 +108,68 @@ const setConsent = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const uploadProfilePicture = catchAsync(async (req: Request, res: Response) => {
-  const profile = await ProfileService.uploadProfilePicture(req.user.id, (req as any).file);
+const pickFile = (req: any) => {
+  // single('image')
+  if (req.file) return req.file;
+
+  // array('image', n)
+  if (Array.isArray(req.files) && req.files.length) return req.files[0];
+
+  // fields([{ name: 'image' }])
+  if (req.files?.image?.[0]) return req.files.image[0];
+
+  return null;
+};
+
+const uploadProfilePicture = catchAsync(async (req, res) => {
+  const r: any = req;
+
+  // fields([{ name:'image' }]) => req.files.image[0]
+  // fallback রাখলাম যদি future এ single('image')/any() ইউজ করো
+  const file =
+    r?.files?.image?.[0] ??
+    r?.file ??
+    (Array.isArray(r?.files) ? r.files[0] : undefined);
+
+  if (!file) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'File is required (send as form-data, key: "image")'
+    );
+  }
+
+  const userId = (req as any).user?.id; // auth middleware যা বসায়
+
+  const updatedProfile = await ProfileService.uploadProfilePicture(userId, file);
+
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
     message: 'Profile picture updated',
-    data: profile,
+    data: updatedProfile, // পুরো profile return করছি; চাইলে শুধু meta পাঠাতে পারো
   });
 });
 
 const addPhoto = catchAsync(async (req: Request, res: Response) => {
-  const profile = await ProfileService.addPhoto(req.user.id, (req as any).file);
+  const r: any = req;
+
+  // prefer fields upload: req.files.image (array)
+  // fallback: multer.any() or single -> req.files (array) or req.file
+  const files: Express.Multer.File[] =
+    r?.files?.image ??
+    (Array.isArray(r?.files) ? r.files : undefined) ??
+    (r?.file ? [r.file] : undefined) ??
+    [];
+
+  if (!files || files.length === 0) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'File is required (send as form-data, key: "image")'
+    );
+  }
+
+  // use new bulk service to add multiple files (enforces 4-photo limit)
+  const profile = await ProfileService.addPhotos((req as any).user.id, files);
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
@@ -127,11 +179,20 @@ const addPhoto = catchAsync(async (req: Request, res: Response) => {
 });
 
 const replacePhoto = catchAsync(async (req: Request, res: Response) => {
+  const file = pickFile(req);
+  if (!file) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'File is required (send as form-data, key: "image")'
+    );
+  }
+
   const profile = await ProfileService.replacePhoto(
-    req.user.id,
+    (req as any).user.id,
     Number(req.params.index),
-    (req as any).file
+    file
   );
+
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
@@ -141,7 +202,11 @@ const replacePhoto = catchAsync(async (req: Request, res: Response) => {
 });
 
 const deletePhoto = catchAsync(async (req: Request, res: Response) => {
-  const profile = await ProfileService.deletePhoto(req.user.id, Number(req.params.index));
+  const profile = await ProfileService.deletePhoto(
+    (req as any).user.id,
+    Number(req.params.index)
+  );
+
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
