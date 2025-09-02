@@ -32,8 +32,11 @@ export interface IProfile extends Document {
   interests: string[];
   values: string[];
 
-  diagnoses: ISimpleKV[];
-  therapies: ISimpleKV[];
+  // diagnoses: ISimpleKV[];
+  // therapies: ISimpleKV[];
+   // ✅ singular (NOT arrays)
+  diagnosis?: ISimpleKV;
+  therapy?: ISimpleKV;
 
   completion?: number;  // onboarding progress (0-100)
   consentAt?: Date;

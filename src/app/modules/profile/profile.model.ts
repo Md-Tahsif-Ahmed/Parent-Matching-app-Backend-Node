@@ -59,14 +59,20 @@ const ProfileSchema = new Schema<IProfile>(
     interests: { type: [String], default: [] },
     values: { type: [String], default: [] },
 
-    diagnoses: { type: [SimpleKVSchema], default: [] },
-    therapies: { type: [SimpleKVSchema], default: [] },
+    // diagnoses: { type: [SimpleKVSchema], default: [] },
+    // therapies: { type: [SimpleKVSchema], default: [] },
+    diagnosis: { type: SimpleKVSchema, required: false },
+    therapy: { type: SimpleKVSchema, required: false },
 
     completion: { type: Number, default: 0 }, // 0–100
     consentAt: { type: Date },
   },
   { timestamps: true }
 );
+
+// optional indexes for quick search/filter
+ProfileSchema.index({ 'diagnosis.name': 1 });
+ProfileSchema.index({ 'therapy.name': 1 });
 
 // geo index for location queries
 ProfileSchema.index({ location: '2dsphere' });

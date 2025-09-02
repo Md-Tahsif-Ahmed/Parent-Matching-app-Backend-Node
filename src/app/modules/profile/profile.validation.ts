@@ -1,13 +1,9 @@
 // profile.validation.ts
 import { z } from 'zod';
 
-const itemsSchema = z.object({
-  items: z.array(
-    z.object({
-      typeName: z.string().min(1).optional(),
-      name: z.string().min(1),
-    })
-  ).max(50)
+const singleItemSchema = z.object({
+  typeName: z.string().min(1).optional(),
+  name: z.string().min(1),
 });
 
 export const ProfileValidation = {
@@ -41,8 +37,13 @@ export const ProfileValidation = {
     }).refine((b) => !!b.interests || !!b.values, { message: 'Provide interests or values' }),
   }),
 
-  setDiagnoses: z.object({ body: itemsSchema }),
-  setTherapies: z.object({ body: itemsSchema }),
+  // accept a single diagnosis / therapy item (allow both { item: {...} } and {...} directly)
+  setDiagnoses: z.object({
+    body: z.union([singleItemSchema, z.object({ item: singleItemSchema })]),
+  }),
+  setTherapies: z.object({
+    body: z.union([singleItemSchema, z.object({ item: singleItemSchema })]),
+  }),
 
   setLocation: z.object({
     body: z.object({

@@ -64,21 +64,25 @@ const setInterestsValues = catchAsync(async (req: Request, res: Response) => {
 });
 
 const setDiagnoses = catchAsync(async (req: Request, res: Response) => {
-  const profile = await ProfileService.setDiagnoses(req.user.id, req.body.items);
+  const bodyAny: any = req.body;
+  const item = bodyAny?.item ?? bodyAny;
+  const profile = await ProfileService.setDiagnoses((req as any).user.id, item);
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Diagnoses updated',
+    message: 'Diagnosis updated',
     data: profile,
   });
 });
-
+ 
 const setTherapies = catchAsync(async (req: Request, res: Response) => {
-  const profile = await ProfileService.setTherapies(req.user.id, req.body.items);
+  const bodyAny: any = req.body;
+  const item = bodyAny?.item ?? bodyAny;
+  const profile = await ProfileService.setTherapies((req as any).user.id, item);
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Therapies updated',
+    message: 'Therapy updated',
     data: profile,
   });
 });

@@ -63,23 +63,25 @@ const setInterestsValues = async (userId: UserId, interests?: string[], values?:
   return p;
 };
 
-const setDiagnoses = async (userId: UserId, items: Array<{ typeName?: string; name: string }>) => {
-  const bad = items.find(it => !it.name || it.name.trim().length === 0);
-  if (bad) throw new ApiError(StatusCodes.BAD_REQUEST, 'Each diagnosis must contain a name');
+const setDiagnoses = async (userId: UserId, item: { typeName?: string; name: string }) => {
+  if (!item || !item.name || item.name.trim().length === 0) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Diagnosis must contain a name');
+  }
   const p = await Profile.findOneAndUpdate(
     { user: userId },
-    { $set: { diagnoses: items } },
+    { $set: { diagnosis: item } },
     { new: true, upsert: true }
   );
   return p;
 };
-
-const setTherapies = async (userId: UserId, items: Array<{ typeName?: string; name: string }>) => {
-  const bad = items.find(it => !it.name || it.name.trim().length === 0);
-  if (bad) throw new ApiError(StatusCodes.BAD_REQUEST, 'Each therapy must contain a name');
+ 
+const setTherapies = async (userId: UserId, item: { typeName?: string; name: string }) => {
+  if (!item || !item.name || item.name.trim().length === 0) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Therapy must contain a name');
+  }
   const p = await Profile.findOneAndUpdate(
     { user: userId },
-    { $set: { therapies: items } },
+    { $set: { therapy: item } },
     { new: true, upsert: true }
   );
   return p;
