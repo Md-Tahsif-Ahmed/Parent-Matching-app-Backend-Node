@@ -77,5 +77,6 @@ ProfileSchema.index({ 'therapy.name': 1 });
 // geo index for location queries
 ProfileSchema.index({ location: '2dsphere' });
 
+ 
 // ---------- Model ----------
 export const Profile = model<IProfile>('Profile', ProfileSchema);
