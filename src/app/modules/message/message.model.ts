@@ -1,30 +1,29 @@
-import { Schema, model } from 'mongoose';
-import { IMessage, MessageModel } from './message.interface';
+import { Schema, model } from "mongoose";
+import { IMessage } from "./message.interface";
 
-const messageSchema = new Schema<IMessage, MessageModel>(
+const AttachmentSchema = new Schema(
   {
-    chatId: {
-      type: Schema.Types.ObjectId,
-      required: true,
-      ref: 'Chat',
-    },
-    sender: {
-      type: Schema.Types.ObjectId,
-      required: true,
-      ref: 'User',
-    },
-    text: { 
-      type: String,
-      required: false 
-    },
-    image: { 
-      type: String,
-      required: false 
-    },
+    url: { type: String, required: true },
+    mime: String,
+    size: Number,
+    name: String,
   },
-  {
-    timestamps: true,
-  }
+  { _id: false }
 );
 
-export const Message = model<IMessage, MessageModel>('Message', messageSchema);
+const MessageSchema = new Schema<IMessage>(
+  {
+    conv: {
+      type: Schema.Types.ObjectId,
+      ref: "Conversation",
+      required: true,
+      index: true,
+    },
+    from: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    text: { type: String },
+    files: { type: [AttachmentSchema], default: [] },
+  },
+  { timestamps: true }
+);
+
+export const MessageModel = model<IMessage>("Message", MessageSchema);

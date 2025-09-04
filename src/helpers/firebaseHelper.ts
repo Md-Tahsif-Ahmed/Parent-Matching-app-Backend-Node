@@ -1,9 +1,10 @@
 import admin from 'firebase-admin';
-import serviceAccount from "../../src/firebaseSDK.json";
+// import serviceAccount from "../../src/firebaseSDK.json";
 import { logger } from '../shared/logger';
 
 // Cast serviceAccount to ServiceAccount type
 const serviceAccountKey: admin.ServiceAccount = serviceAccount as admin.ServiceAccount;
+
 
 // Initialize Firebase SDK
 admin.initializeApp({

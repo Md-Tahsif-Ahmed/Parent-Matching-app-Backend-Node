@@ -1,42 +1,36 @@
-import { Request, Response } from 'express';
-import catchAsync from '../../../shared/catchAsync';
-import sendResponse from '../../../shared/sendResponse';
-import { StatusCodes } from 'http-status-codes';
-import { MessageService } from './message.service';
+import { Request, Response } from "express";
+import catchAsync from "../../../shared/catchAsync";
+import sendResponse from "../../../shared/sendResponse";
+import { StatusCodes } from "http-status-codes";
+import { MessageService } from "./message.service";
 
-const sendMessage = catchAsync(async (req: Request, res: Response) => {
-  const user = req.user.id;
-
-
-  let image;
-  if (req.files && "image" in req.files && req.files.image[0]) {
-    image = `/images/${req.files.image[0].filename}`;
-  }
-
-  const payload = {
-    ...req.body,
-    image:image,
-    sender: user,
-  };
-
-  const message = await MessageService.sendMessageToDB(payload);
-  sendResponse(res, {
-    statusCode: StatusCodes.OK,
+const send = catchAsync(async (req: Request, res: Response) => {
+  const data = await MessageService.send(
+    (req as any).user.id,
+    req.params.convId,
+    req.body?.text,
+    []
+  );
+  return sendResponse(res, {
+    statusCode: StatusCodes.CREATED,
     success: true,
-    message: 'Send Message Successfully',
-    data: message,
+    message: "Sent",
+    data,
   });
 });
 
-const getMessage = catchAsync(async (req: Request, res: Response) => {
-  const id = req.params.id;
-  const messages = await MessageService.getMessageFromDB(id);
-  sendResponse(res, {
+const list = catchAsync(async (req: Request, res: Response) => {
+  const data = await MessageService.list(
+    (req as any).user.id,
+    req.params.convId,
+    Number(req.query.limit) || 50
+  );
+  return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Message Retrieve Successfully',
-    data: messages,
+    message: "OK",
+    data,
   });
 });
 
-export const MessageController = { sendMessage, getMessage };
+export const MessageController = { send, list };

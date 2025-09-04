@@ -1,10 +1,9 @@
-import { Model, Types } from 'mongoose';
-
-export type IMessage = {
-  chatId: Types.ObjectId;
-  sender: Types.ObjectId;
+import { Types } from 'mongoose';
+export interface IAttachment { url: string; mime?: string; size?: number; name?: string; }
+export interface IMessage {
+  conv: Types.ObjectId;
+  from: Types.ObjectId;
   text?: string;
-  image?: string;
-};
-
-export type MessageModel = Model<IMessage, Record<string, unknown>>;
+  files?: IAttachment[];
+  createdAt?: Date; updatedAt?: Date;
+}
