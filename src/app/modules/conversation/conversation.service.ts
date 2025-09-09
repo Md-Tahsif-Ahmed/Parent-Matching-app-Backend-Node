@@ -2,6 +2,9 @@ import { Types } from "mongoose";
 import ApiError from "../../../errors/ApiErrors";
 import { StatusCodes } from "http-status-codes";
 import { ConversationModel } from "./conversation.model";
+import { NoShowPairModel } from "../match/noShowPair.model";
+import { emitToUser } from "../../../helpers/realtime";
+ 
 
 type ObjId = Types.ObjectId | string;
 
@@ -14,8 +17,32 @@ export const ConversationService = {
     const mePart = conv.participants.find((p) => String(p.user) === String(me));
     if (!mePart) throw new ApiError(StatusCodes.FORBIDDEN, "Not a participant");
 
-    mePart.state = "ARCHIVED";
+    // both sides ARCHIVED
+    conv.participants.forEach((p) => (p.state = "ARCHIVED"));
     await conv.save();
+
+    // permanent no-show edges (both directions)
+    try {
+      const a = conv.participants[0]?.user;
+      const b = conv.participants[1]?.user;
+      if (a && b) {
+        await NoShowPairModel.insertMany(
+          [
+            { a, b, reason: "ARCHIVED", at: new Date() },
+            { a: b, b: a, reason: "ARCHIVED", at: new Date() },
+          ],
+          { ordered: false }
+        );
+      }
+    } catch {}
+
+    // realtime update
+    try {
+      for (const p of conv.participants) {
+        emitToUser(String(p.user), "chat:archived", { convId: String(conv._id) });
+      }
+    } catch {}
+
     return conv;
   },
 

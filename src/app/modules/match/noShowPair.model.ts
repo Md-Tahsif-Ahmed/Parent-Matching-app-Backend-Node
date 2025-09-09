@@ -14,3 +14,5 @@ const NoShowPairSchema = new Schema(
 NoShowPairSchema.index({ a: 1, b: 1 }, { unique: true });
 
 export const NoShowPairModel = model("NoShowPair", NoShowPairSchema);
+
+ 

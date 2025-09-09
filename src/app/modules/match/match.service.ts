@@ -5,6 +5,9 @@ import { LikeModel } from './like.model';
 import { BlockModel } from '../block/block.model';
 import { ConversationModel } from '../conversation/conversation.model';
 import { SLOT_LIMIT, DEFAULT_COOLING_DAYS, pairKeyOf } from './types';
+import { sendNotifications } from '../../../helpers/notificationsHelper';
+import { emitToUser } from '../../../helpers/realtime';
+ 
 
 type ObjId = Types.ObjectId | string;
 
@@ -14,52 +17,97 @@ async function isBlocked(a: ObjId, b: ObjId) {
 }
 
 export const MatchService = {
+  // LIKE: create/update like; if reciprocal, ensure conversation exists and notify both
   async like(me: ObjId, target: ObjId) {
     if (String(me) === String(target))
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Cannot like yourself');
-    if (await isBlocked(me, target))
-      throw new ApiError(StatusCodes.FORBIDDEN, 'Blocked');
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'SELF_LIKE_NOT_ALLOWED');
 
+    if (await isBlocked(me, target))
+      throw new ApiError(StatusCodes.FORBIDDEN, 'BLOCKED');
+
+    // Upsert my LIKE
     await LikeModel.updateOne(
       { from: me, to: target },
-      { $set:{ type:'LIKE' }, $unset:{ expiresAt:1 } },
+      { $set: { type: 'LIKE', expiresAt: null } },
       { upsert: true }
     );
 
-    const rec = await LikeModel.findOne({ from: target, to: me, type:'LIKE' });
-    if (!rec) return { matched:false };
+    // Check reciprocal
+    const hasReciprocal = await LikeModel.exists({ from: target, to: me, type: 'LIKE' });
 
-    const pairKey = pairKeyOf(String(me), String(target));
-    let conv = await ConversationModel.findOne({ pairKey });
+    if (!hasReciprocal) {
+      // Optional: realtime ping to target that they got a like
+      try { emitToUser(String(target), 'like:inbound', { from: String(me) }); } catch {}
+      return { matched: false };
+    }
+
+    // Ensure conversation (PENDING,PENDING)
+    const key = pairKeyOf(String(me), String(target));
+    let conv = await ConversationModel.findOne({ pairKey: key });
     if (!conv) {
       conv = await ConversationModel.create({
-        pairKey,
+        pairKey: key,
         participants: [
-          { user: me as any,    state: 'PENDING' },
-          { user: target as any,state: 'PENDING' }
-        ]
-      } as any);
+          { user: me,     state: 'PENDING' },
+          { user: target, state: 'PENDING' },
+        ],
+        lastMessageAt: null,
+      });
     }
-    return { matched:true, convId: conv._id };
+
+    // Persisted notif to both
+    await sendNotifications({
+      text: "It's a match! Say hello 👋",
+      receiver: target,
+      referenceId: String(conv._id),
+      screen: "CHAT",
+      read: false,
+      sender: me,
+    });
+    await sendNotifications({
+      text: "It's a match! Say hello 👋",
+      receiver: me,
+      referenceId: String(conv._id),
+      screen: "CHAT",
+      read: false,
+      sender: target,
+    });
+
+    // Realtime
+    try {
+      emitToUser(String(me),     'match:new', { convId: String(conv._id), with: String(target) });
+      emitToUser(String(target), 'match:new', { convId: String(conv._id), with: String(me) });
+    } catch {}
+
+    return { matched: true, convId: String(conv._id) };
   },
 
+  // PASS with cooling-off window
   async pass(me: ObjId, target: ObjId, days?: number) {
     if (String(me) === String(target))
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Cannot pass yourself');
-    const ms = (days ?? DEFAULT_COOLING_DAYS) * 24*60*60*1000;
-    const expiresAt = new Date(Date.now() + ms);
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'SELF_PASS_NOT_ALLOWED');
+
+    if (await isBlocked(me, target))
+      throw new ApiError(StatusCodes.FORBIDDEN, 'BLOCKED');
+
+    const d = Math.max(1, Math.min(30, Number(days) || DEFAULT_COOLING_DAYS));
+    const expiresAt = new Date(Date.now() + d*24*60*60*1000);
+
     await LikeModel.updateOne(
       { from: me, to: target },
-      { $set:{ type:'PASS', expiresAt } },
+      { $set: { type: 'PASS', expiresAt } },
       { upsert: true }
     );
-    return { coolingOffUntil: expiresAt };
+
+    return { ok: true, expiresAt };
   },
 
+  // Start chat: check my ACTIVE slots and set me ACTIVE
   async startChat(me: ObjId, convId: string) {
     const conv = await ConversationModel.findById(convId);
     if (!conv) throw new ApiError(StatusCodes.NOT_FOUND, 'Conversation not found');
-    const mePart = conv.participants.find(p => String(p.user) === String(me));
+
+    const mePart = conv.participants.find((p) => String(p.user) === String(me));
     if (!mePart) throw new ApiError(StatusCodes.FORBIDDEN, 'Not a participant');
 
     const myActive = await ConversationModel.countDocuments({
@@ -71,6 +119,29 @@ export const MatchService = {
 
     mePart.state = 'ACTIVE';
     await conv.save();
+
+    const other = conv.participants.find(p => String(p.user) !== String(me));
+
+    // Persisted notification to other
+    if (other) {
+      await sendNotifications({
+        text: "Chat started. You can now exchange messages.",
+        receiver: other.user,
+        referenceId: String(conv._id),
+        screen: "CHAT",
+        read: false,
+        sender: me,
+      });
+    }
+
+    // Realtime state push
+    try {
+      if (other) {
+        emitToUser(String(other.user), 'chat:state', { convId: String(conv._id), by: String(me), state: 'ACTIVE' });
+      }
+      emitToUser(String(me), 'chat:state', { convId: String(conv._id), by: String(me), state: 'ACTIVE' });
+    } catch {}
+
     return conv;
   }
 };
