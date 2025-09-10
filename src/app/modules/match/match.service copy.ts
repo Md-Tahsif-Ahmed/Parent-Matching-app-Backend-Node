@@ -6,7 +6,7 @@ import { BlockModel } from '../block/block.model';
 import { ConversationModel } from '../conversation/conversation.model';
 import { SLOT_LIMIT, DEFAULT_COOLING_DAYS, pairKeyOf } from './types';
 import { sendNotifications } from '../../../helpers/notificationsHelper';
-import { emitToUser, emitToConv } from "../../../helpers/realtime";
+import { emitToUser } from '../../../helpers/realtime';
  
 
 type ObjId = Types.ObjectId | string;
@@ -33,11 +33,6 @@ export const MatchService = {
       { $set: { type: 'LIKE', expiresAt: null } },
       { upsert: true }
     );
-
-    // emit inbound-like realtime event to target (so B sees incoming like immediately)
-    try {
-      emitToUser(String(target), 'like:inbound', { from: String(me) });
-    } catch {}
 
     // Check reciprocal
     const hasReciprocal = await LikeModel.exists({ from: target, to: me, type: 'LIKE' });
@@ -82,10 +77,8 @@ export const MatchService = {
 
     // Realtime
     try {
-      // notify conv room & user rooms on match (existing)
-      emitToConv(String(conv._id), "match:created", { convId: String(conv._id), users: [String(me), String(target)] });
-      emitToUser(String(target), "match:notify", { from: String(me), convId: String(conv._id) });
-      emitToUser(String(me), "match:notify", { from: String(target), convId: String(conv._id) });
+      emitToUser(String(me),     'match:new', { convId: String(conv._id), with: String(target) });
+      emitToUser(String(target), 'match:new', { convId: String(conv._id), with: String(me) });
     } catch {}
 
     return { matched: true, convId: String(conv._id) };
