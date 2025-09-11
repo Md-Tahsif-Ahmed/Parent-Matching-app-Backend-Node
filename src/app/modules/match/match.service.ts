@@ -1,3 +1,4 @@
+// src/app/modules/match/match.service.ts (তোমার ফাইলে যে path আছে সেটাই)
 import { Types } from 'mongoose';
 import ApiError from '../../../errors/ApiErrors';
 import { StatusCodes } from 'http-status-codes';
@@ -6,13 +7,13 @@ import { BlockModel } from '../block/block.model';
 import { ConversationModel } from '../conversation/conversation.model';
 import { SLOT_LIMIT, DEFAULT_COOLING_DAYS, pairKeyOf } from './types';
 import { sendNotifications } from '../../../helpers/notificationsHelper';
-import { emitToUser, emitToConv } from "../../../helpers/realtime";
- 
+import { emitToUser } from '../../../helpers/realtime';
+import { MessageModel } from '../message/message.model';
 
 type ObjId = Types.ObjectId | string;
 
 async function isBlocked(a: ObjId, b: ObjId) {
-  const cnt = await BlockModel.countDocuments({ $or: [{by:a,user:b},{by:b,user:a}] });
+  const cnt = await BlockModel.countDocuments({ $or: [{ by: a, user: b }, { by: b, user: a }] });
   return cnt > 0;
 }
 
@@ -21,34 +22,53 @@ export const MatchService = {
   async like(me: ObjId, target: ObjId) {
     console.log("++++++", me, target);
     if (String(me) === String(target))
-      
       throw new ApiError(StatusCodes.BAD_REQUEST, 'SELF_LIKE_NOT_ALLOWED');
 
     if (await isBlocked(me, target))
       throw new ApiError(StatusCodes.FORBIDDEN, 'BLOCKED');
 
-    // Upsert my LIKE
-    await LikeModel.updateOne(
+    // ---- Upsert LIKE + detect if this is a NEW like or a transition to LIKE (e.g., PASS -> LIKE)
+    const raw: any = await LikeModel.findOneAndUpdate(
       { from: me, to: target },
       { $set: { type: 'LIKE', expiresAt: null } },
-      { upsert: true }
+      {
+        upsert: true,
+        new: false,              // return the PRE-UPDATE doc
+        rawResult: true,         // to read lastErrorObject.updatedExisting
+        setDefaultsOnInsert: true,
+      }
     );
 
-    // emit inbound-like realtime event to target (so B sees incoming like immediately)
-    try {
-      emitToUser(String(target), 'like:inbound', { from: String(me) });
-    } catch {}
+    const wasCreated = !raw?.lastErrorObject?.updatedExisting;   // newly inserted
+    const prevType   = raw?.value?.type;                         // previous type if existed
+    const transitionedToLike = wasCreated || prevType !== 'LIKE';
 
     // Check reciprocal
     const hasReciprocal = await LikeModel.exists({ from: target, to: me, type: 'LIKE' });
 
     if (!hasReciprocal) {
-      // Optional: realtime ping to target that they got a like
-      try { emitToUser(String(target), 'like:inbound', { from: String(me) }); } catch {}
+      // ✅ Non-reciprocal case:
+      // - Realtime ping (only once when newly LIKE’d)
+      // - Persisted notification so offline user also sees it later
+      if (transitionedToLike) {
+        try {
+          emitToUser(String(target), 'like:inbound', { from: String(me) });
+        } catch {}
+
+        // Persisted notif (sender populated in NotificationService.getNotificationFromDB)
+        await sendNotifications({
+          text: "Someone liked your profile ❤️",
+          receiver: target,
+          referenceId: String(me),   // you may use senderId here for deep-linking to profile
+          screen: "CHAT",            // keeping "CHAT" for consistency with your schema
+          read: false,
+          sender: me,
+        });
+      }
       return { matched: false };
     }
 
-    // Ensure conversation (PENDING,PENDING)
+    // ---- Reciprocal: ensure conversation and notify both (unchanged)
     const key = pairKeyOf(String(me), String(target));
     let conv = await ConversationModel.findOne({ pairKey: key });
     if (!conv) {
@@ -80,18 +100,16 @@ export const MatchService = {
       sender: target,
     });
 
-    // Realtime
+    // Realtime match events
     try {
-      // notify conv room & user rooms on match (existing)
-      emitToConv(String(conv._id), "match:created", { convId: String(conv._id), users: [String(me), String(target)] });
-      emitToUser(String(target), "match:notify", { from: String(me), convId: String(conv._id) });
-      emitToUser(String(me), "match:notify", { from: String(target), convId: String(conv._id) });
+      emitToUser(String(me),     'match:new', { convId: String(conv._id), with: String(target) });
+      emitToUser(String(target), 'match:new', { convId: String(conv._id), with: String(me) });
     } catch {}
 
     return { matched: true, convId: String(conv._id) };
   },
 
-  // PASS with cooling-off window
+  /// PASS with cooling-off window
   async pass(me: ObjId, target: ObjId, days?: number) {
     if (String(me) === String(target))
       throw new ApiError(StatusCodes.BAD_REQUEST, 'SELF_PASS_NOT_ALLOWED');
@@ -119,6 +137,9 @@ export const MatchService = {
     const mePart = conv.participants.find((p) => String(p.user) === String(me));
     if (!mePart) throw new ApiError(StatusCodes.FORBIDDEN, 'Not a participant');
 
+    // idempotency guard
+    const alreadyActive = mePart.state === 'ACTIVE';
+
     const myActive = await ConversationModel.countDocuments({
       'participants.user': me,
       'participants.state': 'ACTIVE'
@@ -141,7 +162,44 @@ export const MatchService = {
         read: false,
         sender: me,
       });
+    } 
+
+    //  massage create in massage table
+    // *************
+       // --- NEW: persist a "start chat" system message once ---
+   if (!alreadyActive) {
+     // ডুপ্লিকেট এড়াতে আগেরটা আছে কিনা দেখে নেই (টেক্সট ট্যাগ দিয়ে)
+    const TAG = '__SYSTEM_START_CHAT__';
+     const exists = await MessageModel.exists({ conv: conv._id, text: TAG });
+      if (!exists) {
+       const msg = await MessageModel.create({
+         conv: conv._id,
+         from: me as any,        // চাইলে এখানে আলাদা system user ব্যবহার করতে পারো
+         text: TAG,              // UI চাইলে এই TAG-কে "Chat started" হিসেবে রেন্ডার করবে
+          files: [],
+       });
+       try {
+         // রিয়েলটাইমে পুশ—meta যথেষ্ট; বড় পে-লোড নেই
+         emitToUser(String(me), 'chat:message', {
+           convId: String(conv._id),
+           from: String(me),
+          text: TAG,
+           createdAt: msg.createdAt,
+         });
+         if (other) {
+           emitToUser(String(other.user), 'chat:message', {
+            convId: String(conv._id),
+           from: String(me),
+             text: TAG,
+            createdAt: msg.createdAt,
+          });
+        }
+      } catch {}
     }
+  }
+
+
+    // *************
 
     // Realtime state push
     try {
@@ -154,3 +212,4 @@ export const MatchService = {
     return conv;
   }
 };
+

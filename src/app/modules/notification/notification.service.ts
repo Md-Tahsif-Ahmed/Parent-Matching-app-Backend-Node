@@ -1,59 +1,62 @@
+// src/app/modules/notification/notification.service.ts
 import { JwtPayload } from "jsonwebtoken";
-import { INotification } from "./notification.interface";
 import { Notification } from "./notification.model";
 
-// get notifications
-const getNotificationFromDB = async (
-  user: JwtPayload
-): Promise<INotification> => {
-  const result = await Notification.find({ receiver: user.id }).populate({
-    path: "sender",
-    select: "name profile",
-  });
-
-  const unreadCount = await Notification.countDocuments({
-    receiver: user.id,
-    read: false,
-  });
-
-  const data: any = {
-    result,
-    unreadCount,
-  };
-
-  return data;
-};
-
-// read notifications only for user
-const readNotificationToDB = async (
-  user: JwtPayload
-): Promise<INotification | undefined> => {
-  const result: any = await Notification.updateMany(
-    { receiver: user.id, read: false },
-    { $set: { read: true } }
-  );
-  return result;
-};
-
-// get notifications for admin
-const adminNotificationFromDB = async () => {
-  const result = await Notification.find({ type: "ADMIN" });
-  return result;
-};
-
-// read notifications only for admin
-const adminReadNotificationToDB = async (): Promise<INotification | null> => {
-  const result: any = await Notification.updateMany(
-    { type: "ADMIN", read: false },
-    { $set: { read: true } },
-    { new: true }
-  );
-  return result;
-};
+type ListOpts = { page?: number; limit?: number };
 
 export const NotificationService = {
-  adminNotificationFromDB,
-  getNotificationFromDB,
-  readNotificationToDB,
-  adminReadNotificationToDB,
+  // USER: list notifications (populated sender)
+  async getNotificationFromDB(user: JwtPayload, opts: ListOpts = {}) {
+    const page  = Math.max(1, Number(opts.page || 1));
+    const limit = Math.min(100, Math.max(1, Number(opts.limit || 20)));
+    const skip  = (page - 1) * limit;
+
+    // কোনো কোনো JWT-তে id এর বদলে sub থাকে—সেই কেসে ফ্যালব্যাক
+    const userId = (user as any)?.id || (user as any)?.sub;
+
+    const [items, total, unreadCount] = await Promise.all([
+      Notification.find({ receiver: userId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select("text screen referenceId read createdAt sender") // প্রয়োজনীয় ফিল্ড
+        .populate({ path: "sender", select: "name profile _id" })
+        .lean({ virtuals: true }),
+      Notification.countDocuments({ receiver: userId }),
+      Notification.countDocuments({ receiver: userId, read: false }),
+    ]);
+
+    return {
+      items,            // Array<{ ..., sender: { _id, name, profile } }>
+      total,
+      unreadCount,
+      page,
+      pageCount: Math.ceil(total / limit),
+    };
+  },
+
+  // USER: mark all as read
+  async readNotificationToDB(user: JwtPayload) {
+    const userId = (user as any)?.id || (user as any)?.sub;
+    const res = await Notification.updateMany(
+      { receiver: userId, read: false },
+      { $set: { read: true } }
+    );
+    return { modified: res.modifiedCount ?? 0 };
+  },
+
+  // ADMIN:
+  async adminNotificationFromDB() {
+    return Notification.find({ type: "ADMIN" })
+      .sort({ createdAt: -1 })
+      .lean();
+  },
+
+  async adminReadNotificationToDB() {
+    const res = await Notification.updateMany(
+      { type: "ADMIN", read: false },
+      { $set: { read: true } }
+    );
+    return { modified: res.modifiedCount ?? 0 };
+  },
 };

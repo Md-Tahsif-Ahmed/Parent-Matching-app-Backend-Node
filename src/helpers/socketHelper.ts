@@ -1,62 +1,55 @@
+// src/helpers/socketHelper.ts
 import colors from "colors";
 import { Server } from "socket.io";
 import { logger } from "../shared/logger";
 import jwt from "jsonwebtoken";
+import config from "../config";
 
-const socket = (io: Server)=>{
-    io.on('connection', socket=>{
-        logger.info(colors.blue('A User connected'));
+const socket = (io: Server) => {
+  io.on("connection", (socket) => {
+    logger.info(colors.blue("A user connected"));
 
-        // --- auto-join user room from handshake (token or query) ---
-        try {
-          const token = (socket.handshake.auth && (socket.handshake.auth as any).token)
-            || ((socket.handshake.headers && (socket.handshake.headers.authorization || '')?.split(' ')[1]) as string | undefined)
-            || (socket.handshake.query && (socket.handshake.query as any).token);
+    // Auto-join from token (header/query/auth)
+    try {
+      const bearer =
+        (socket.handshake.auth as any)?.token ||
+        (socket.handshake.headers?.authorization || "").split(" ")[1] ||
+        (socket.handshake.query as any)?.token;
 
-          let userId: string | undefined;
-          if (token && process.env.JWT_SECRET) {
-            try {
-              const payload = jwt.verify(token as string, process.env.JWT_SECRET) as any;
-              userId = payload?.id;
-            } catch {}
-          }
-          if (!userId && (socket.handshake.query && (socket.handshake.query as any).userId)) {
-            userId = String((socket.handshake.query as any).userId);
-          }
-          if (userId) {
-            socket.join(`user:${userId}`);
-            socket.data.userId = userId;
-            logger.info(colors.green(`auto-joined room user:${userId}`));
-          }
-        } catch (e) {
-          logger.info(colors.yellow('user auto-join failed'));
+      if (bearer) {
+        const decoded: any = jwt.verify(bearer, config.jwt.secret as string);
+        const uid = decoded?.id || decoded?._id || decoded?.userId;
+        if (uid) {
+          socket.join(`user:${uid}`);
+          logger.info(colors.green(`joined user room -> user:${uid}`));
         }
-        // ---------------------------------------------------------
+      }
+    } catch {
+      logger.warn(colors.yellow("socket token verify failed"));
+    }
 
-        // Join user-level room (call after login) - kept for backward-compat
-        socket.on("user:join", ({ userId }: { userId: string }) => {
-            if (!userId) return;
-            socket.join(`user:${userId}`);
-            logger.info(colors.green(`joined room user:${userId}`));
-        });
+    // Fallback: manual join (current code)
+    socket.on("user:join", ({ userId }: { userId: string }) => {
+      if (!userId) return;
+      socket.join(`user:${userId}`);
+      logger.info(colors.green(`joined room user:${userId}`));
+    });
 
-        // Join/leave conversation room
-        socket.on("conv:join", ({ convId }: { convId: string }) => {
-            if (!convId) return;
-            socket.join(`conv:${convId}`);
-            logger.info(colors.green(`joined room conv:${convId}`));
-        });
-        socket.on("conv:leave", ({ convId }: { convId: string }) => {
-            if (!convId) return;
-            socket.leave(`conv:${convId}`);
-            logger.info(colors.yellow(`left room conv:${convId}`));
-        });
+    socket.on("conv:join", ({ convId }: { convId: string }) => {
+      if (!convId) return;
+      socket.join(`conv:${convId}`);
+      logger.info(colors.green(`joined room conv:${convId}`));
+    });
+    socket.on("conv:leave", ({ convId }: { convId: string }) => {
+      if (!convId) return;
+      socket.leave(`conv:${convId}`);
+      logger.info(colors.yellow(`left room conv:${convId}`));
+    });
 
-        // disconnect
-        socket.on("disconnect", ()=>{
-            logger.info(colors.red('A user disconnect'));
-        })
-    })
-}
+    socket.on("disconnect", () => {
+      logger.info(colors.red("A user disconnect"));
+    });
+  });
+};
 
-export const socketHelper = { socket }
+export const socketHelper = { socket };

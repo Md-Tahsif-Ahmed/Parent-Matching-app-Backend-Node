@@ -5,8 +5,9 @@ export type INotification = {
     receiver?: Types.ObjectId;
     read: boolean;
     referenceId?: string;
-    screen?: "RESERVATION" | "CHAT";
+    screen?: "MATCH" | "CHAT";
     type?: "ADMIN";
+    sender?: Types.ObjectId | string;
 };
 
 export type NotificationModel = Model<INotification>;
