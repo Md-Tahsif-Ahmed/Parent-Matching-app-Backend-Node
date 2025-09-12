@@ -43,7 +43,7 @@ const ProfileSchema = new Schema<IProfile>(
     user: { type: Schema.Types.ObjectId, ref: 'User', unique: true, required: true },
 
     aboutMe: { type: String, trim: true },
-    childAge: { type: Number }, // months or years (decide in FE; recommend months)
+    childDOB: { type: Date }, // months or years (decide in FE; recommend months)
 
     profilePicture: { type: FileMetaSchema },
     galleryPhotos: {

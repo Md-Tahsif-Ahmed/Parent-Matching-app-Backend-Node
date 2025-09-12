@@ -20,7 +20,7 @@ export interface IProfile extends Document {
   user: Types.ObjectId;
 
   aboutMe?: string;
-  childAge?: number; // store in months (recommended)
+  childDOB?: Date; // store in months (recommended)
 
   profilePicture?: IFileMeta;
   galleryPhotos?: IFileMeta[];

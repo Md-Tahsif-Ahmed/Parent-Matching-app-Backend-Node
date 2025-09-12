@@ -1,9 +1,18 @@
-import { Types } from 'mongoose';
-export interface IAttachment { url: string; mime?: string; size?: number; name?: string; }
+import { Types } from "mongoose";
+export interface IAttachment {
+  url: string;
+  mime?: string;
+  size?: number;
+  name?: string;
+}
 export interface IMessage {
   conv: Types.ObjectId;
   from: Types.ObjectId;
   text?: string;
   files?: IAttachment[];
-  createdAt?: Date; updatedAt?: Date;
+  deliveredAt?: Date;
+  seenAt?: Date;
+
+  createdAt?: Date;
+  updatedAt?: Date;
 }

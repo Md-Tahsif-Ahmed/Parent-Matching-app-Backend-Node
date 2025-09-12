@@ -7,10 +7,11 @@ import { sendNotifications } from "../../../helpers/notificationsHelper";
 import { emitToConv, emitToUser } from "../../../helpers/realtime";
 import { SLOT_LIMIT } from "../match/types";
 
+
 type ObjId = Types.ObjectId | string;
 
 export const MessageService = {
-  // SEND: deliveredAt এখনই বসবে
+ 
   async send(me: ObjId, convId: string, text?: string, files?: any[]) {
     const conv = await ConversationModel.findById(convId);
     if (!conv)
@@ -21,20 +22,21 @@ export const MessageService = {
 
     const otherPart = conv.participants.find((p) => String(p.user) !== String(me));
 
-    // ✅ প্রথম মেসেজে ACTIVE (slot ফাঁকা থাকলে)
+    // ✅ প্রথম মেসেজেই ACTIVE (slot ফাঁকা থাকলে)
     if (mePart.state !== "ACTIVE") {
       const myActive = await ConversationModel.countDocuments({
         "participants.user": me,
         "participants.state": "ACTIVE",
       });
       if (myActive >= SLOT_LIMIT) {
+        // UI চাইলে এখান থেকে "একটা চ্যাট archive করে আবার চেষ্টা করো" মেসেজ দেখাবে
         throw new ApiError(StatusCodes.CONFLICT, "ACTIVE_LIMIT_REACHED");
       }
       mePart.state = "ACTIVE";
       await conv.save();
     }
 
-    // ❗️Disallow: ARCHIVED/BLOCKED হলে সেন্ড নিষেধ
+    // ❗️Send disallow rules: আগের মতোই
     const states = [mePart.state, otherPart?.state];
     if (states.includes("ARCHIVED") || states.includes("BLOCKED")) {
       throw new ApiError(StatusCodes.FORBIDDEN, "CHAT_NOT_ALLOWED");
@@ -46,20 +48,16 @@ export const MessageService = {
       throw new ApiError(StatusCodes.BAD_REQUEST, "EMPTY_MESSAGE");
     }
 
-    const now = new Date();
     const msg = await MessageModel.create({
       conv: conv._id,
       from: me as any,
       ...(hasText ? { text: text!.trim() } : {}),
       ...(hasFiles ? { files } : {}),
-      deliveredAt: now,          // 👈 create-সময়ই সেট
-      // seenAt ডিফল্টে null/undefined থাকবে (schema-তে default: null রাখলে ভালো)
     });
 
-    conv.lastMessageAt = now;
+    conv.lastMessageAt = new Date();
     await conv.save();
 
-    // Push/Notif
     if (otherPart) {
       await sendNotifications({
         text: hasText ? text!.slice(0, 140) : "Sent an attachment",
@@ -71,17 +69,13 @@ export const MessageService = {
       });
     }
 
-    // Realtime emit
     try {
       emitToConv(String(conv._id), "chat:message", {
-        id: String(msg._id),
         convId: String(conv._id),
         from: String(me),
         text: hasText ? text!.trim() : undefined,
         files: hasFiles ? files : undefined,
-        createdAt: msg.createdAt ?? now,
-        deliveredAt: msg.deliveredAt ?? now,   // 👈 sender UI তে সাথে সাথে দেখাবে
-        seenAt: msg.seenAt ?? null,
+        createdAt: new Date(),
       });
       if (otherPart) {
         emitToUser(String(otherPart.user), "notif:new", {
@@ -96,7 +90,8 @@ export const MessageService = {
     return msg;
   },
 
-  // LIST (আগের মতোই)
+
+
   async list(me: ObjId, convId: string, limit = 50) {
     const conv = await ConversationModel.findById(convId);
     if (!conv) throw new ApiError(StatusCodes.NOT_FOUND, "Conversation not found");
@@ -104,41 +99,9 @@ export const MessageService = {
     const mePart = conv.participants.find((p) => String(p.user) === String(me));
     if (!mePart) throw new ApiError(StatusCodes.FORBIDDEN, "Not a participant");
 
-    const items = await MessageModel.find({ conv: convId })
-      .sort({ createdAt: -1 })
-      .limit(limit);
-
+    const items = await MessageModel.find({ conv: convId }).sort({ createdAt: -1 }).limit(limit);
     return items.reverse();
   },
-
-  // NEW: চ্যাট ওপেন হলেই অপরের পাঠানো not-seen মেসেজগুলো bulk seen
-  async markSeen(me: ObjId, convId: string) {
-    const conv = await ConversationModel.findById(convId);
-    if (!conv) throw new ApiError(StatusCodes.NOT_FOUND, "Conversation not found");
-
-    const mePart = conv.participants.find((p) => String(p.user) === String(me));
-    if (!mePart) throw new ApiError(StatusCodes.FORBIDDEN, "Not a participant");
-
-    const now = new Date();
-    const res = await MessageModel.updateMany(
-      {
-        conv: convId,
-        from: { $ne: me },
-        $or: [{ seenAt: { $exists: false } }, { seenAt: null }],
-      },
-      { $set: { seenAt: now } }
-    );
-
-    // রিয়েলটাইম ইঙ্গিত (optional): সবাইকে বলো যে এই কনোভারসেশন seen হলো
-    try {
-      if ((res as any).modifiedCount > 0) {
-        emitToConv(String(conv._id), "chat:seen", {
-          convId: String(conv._id),
-          seenAt: now,
-        });
-      }
-    } catch {}
-
-    return { seenAt: now, count: (res as any).modifiedCount ?? 0 };
-  },
 };
+
+

@@ -21,7 +21,7 @@ router.patch('/about-me',
 );
 
 router.patch('/child-age',
-  validateRequest(ProfileValidation.setChildAge),
+  validateRequest(ProfileValidation.setChildDOB),
   ProfileController.setChildAge
 );
 

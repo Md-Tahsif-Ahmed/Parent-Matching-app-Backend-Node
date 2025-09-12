@@ -18,9 +18,9 @@ export const ProfileValidation = {
   }),
 
   // NEW: childAge only
-  setChildAge: z.object({
+  setChildDOB: z.object({
     body: z.object({
-      childAge: z.number().int().min(0).max(600),
+      childAge: z.date(),
     }),
   }),
 

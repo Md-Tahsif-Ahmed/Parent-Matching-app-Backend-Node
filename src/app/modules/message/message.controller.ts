@@ -4,7 +4,7 @@ import sendResponse from "../../../shared/sendResponse";
 import { StatusCodes } from "http-status-codes";
 import { MessageService } from "./message.service";
 
-// src/app/modules/message/message.controller.ts
+// SEND
 const send = catchAsync(async (req: Request, res: Response) => {
   const text = typeof req.body?.text === "string" ? req.body.text : undefined;
 
@@ -46,8 +46,7 @@ const send = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-
-
+// LIST
 const list = catchAsync(async (req: Request, res: Response) => {
   const data = await MessageService.list(
     (req as any).user.id,
@@ -62,4 +61,18 @@ const list = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-export const MessageController = { send, list };
+// NEW: SEEN (চ্যাট ওপেন হলে bulk seen)
+const seen = catchAsync(async (req: Request, res: Response) => {
+  const data = await MessageService.markSeen(
+    (req as any).user.id,
+    req.params.convId
+  );
+  return sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Seen updated",
+    data, // { seenAt, count }
+  });
+});
+
+export const MessageController = { send, list, seen };

@@ -7,7 +7,7 @@ const NotificationSchema = new Schema<INotification>(
     receiver: { type: Schema.Types.ObjectId, ref: 'User', required: false, index: true },
     read: { type: Boolean, default: false },
     referenceId: { type: String, required: false },
-    screen: { type: String, enum: ['MATCH', 'CHAT'], required: false },
+    screen: { type: String, enum: ['MATCH','LIKE','CHAT'], required: false },
     type: { type: String, required: false },
     // ADD sender so populate(...) works
     sender: { type: Schema.Types.ObjectId, ref: 'User', required: false },

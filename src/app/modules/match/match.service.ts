@@ -8,7 +8,8 @@ import { ConversationModel } from '../conversation/conversation.model';
 import { SLOT_LIMIT, DEFAULT_COOLING_DAYS, pairKeyOf } from './types';
 import { sendNotifications } from '../../../helpers/notificationsHelper';
 import { emitToUser } from '../../../helpers/realtime';
-import { MessageModel } from '../message/message.model';
+import { MessageService } from '../message/message.service'; // উপরে একবার যোগ করো
+import { IAttachment } from '../message/message.interface';
 
 type ObjId = Types.ObjectId | string;
 
@@ -128,88 +129,7 @@ export const MatchService = {
 
     return { ok: true, expiresAt };
   },
+ 
 
-  // Start chat: check my ACTIVE slots and set me ACTIVE
-  async startChat(me: ObjId, convId: string) {
-    const conv = await ConversationModel.findById(convId);
-    if (!conv) throw new ApiError(StatusCodes.NOT_FOUND, 'Conversation not found');
-
-    const mePart = conv.participants.find((p) => String(p.user) === String(me));
-    if (!mePart) throw new ApiError(StatusCodes.FORBIDDEN, 'Not a participant');
-
-    // idempotency guard
-    const alreadyActive = mePart.state === 'ACTIVE';
-
-    const myActive = await ConversationModel.countDocuments({
-      'participants.user': me,
-      'participants.state': 'ACTIVE'
-    });
-    if (myActive >= SLOT_LIMIT)
-      throw new ApiError(StatusCodes.CONFLICT, 'ACTIVE_LIMIT_REACHED');
-
-    mePart.state = 'ACTIVE';
-    await conv.save();
-
-    const other = conv.participants.find(p => String(p.user) !== String(me));
-
-    // Persisted notification to other
-    if (other) {
-      await sendNotifications({
-        text: "Chat started. You can now exchange messages.",
-        receiver: other.user,
-        referenceId: String(conv._id),
-        screen: "CHAT",
-        read: false,
-        sender: me,
-      });
-    } 
-
-    //  massage create in massage table
-    // *************
-       // --- NEW: persist a "start chat" system message once ---
-   if (!alreadyActive) {
-     // ডুপ্লিকেট এড়াতে আগেরটা আছে কিনা দেখে নেই (টেক্সট ট্যাগ দিয়ে)
-    const TAG = '__SYSTEM_START_CHAT__';
-     const exists = await MessageModel.exists({ conv: conv._id, text: TAG });
-      if (!exists) {
-       const msg = await MessageModel.create({
-         conv: conv._id,
-         from: me as any,        // চাইলে এখানে আলাদা system user ব্যবহার করতে পারো
-         text: TAG,              // UI চাইলে এই TAG-কে "Chat started" হিসেবে রেন্ডার করবে
-          files: [],
-       });
-       try {
-         // রিয়েলটাইমে পুশ—meta যথেষ্ট; বড় পে-লোড নেই
-         emitToUser(String(me), 'chat:message', {
-           convId: String(conv._id),
-           from: String(me),
-          text: TAG,
-           createdAt: msg.createdAt,
-         });
-         if (other) {
-           emitToUser(String(other.user), 'chat:message', {
-            convId: String(conv._id),
-           from: String(me),
-             text: TAG,
-            createdAt: msg.createdAt,
-          });
-        }
-      } catch {}
-    }
-  }
-
-
-    // *************
-
-    // Realtime state push
-    try {
-      if (other) {
-        emitToUser(String(other.user), 'chat:state', { convId: String(conv._id), by: String(me), state: 'ACTIVE' });
-      }
-      emitToUser(String(me), 'chat:state', { convId: String(conv._id), by: String(me), state: 'ACTIVE' });
-    } catch {}
-
-    return conv;
-  }
 };
 
