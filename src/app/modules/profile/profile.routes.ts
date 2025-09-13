@@ -20,10 +20,12 @@ router.patch('/about-me',
   ProfileController.setAboutMe
 );
 
-router.patch('/child-age',
+router.patch(
+  '/child-dob',
   validateRequest(ProfileValidation.setChildDOB),
-  ProfileController.setChildAge
+  ProfileController.setChildDOB
 );
+
 
 router.put('/journey',
   validateRequest(ProfileValidation.setJourney),

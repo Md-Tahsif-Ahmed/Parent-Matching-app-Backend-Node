@@ -1,12 +1,8 @@
-// src/modules/message/message.controller.ts
-import path from "path";
 import { Request, Response } from "express";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import { StatusCodes } from "http-status-codes";
 import { MessageService } from "./message.service";
-
-const UPLOAD_ROOT = process.env.UPLOAD_ROOT || path.resolve(process.cwd(), "uploads");
 
 // SEND
 const send = catchAsync(async (req: Request, res: Response) => {
@@ -28,37 +24,12 @@ const send = catchAsync(async (req: Request, res: Response) => {
   const uploads = pickFiles();
 
   // MessageModel schema → { url, mime, size, name }
-  // diskStorage হলে f.path থাকবে -> /uploads/... বানাই
-  // memoryStorage হলে fallback হিসেবে data URL
-  const files = uploads.map((f) => {
-    const fileAny = f as any;
-    if (fileAny.path && typeof fileAny.path === "string") {
-      const rel = path.relative(UPLOAD_ROOT, fileAny.path).split(path.sep).join("/"); // windows-safe
-      const publicUrl = `/uploads/${rel}`;
-      return {
-        url: publicUrl,
-        mime: f.mimetype,
-        size: f.size,
-        name: f.originalname,
-      };
-    }
-    // fallback: memoryStorage
-    if (f.buffer) {
-      return {
-        url: `data:${f.mimetype};base64,${f.buffer.toString("base64")}`,
-        mime: f.mimetype,
-        size: f.size,
-        name: f.originalname,
-      };
-    }
-    // very edge-case fallback
-    return {
-      url: "",
-      mime: f.mimetype,
-      size: f.size,
-      name: f.originalname,
-    };
-  });
+  const files = uploads.map(f => ({
+    url: `data:${f.mimetype};base64,${f.buffer.toString("base64")}`,
+    mime: f.mimetype,
+    size: f.size,
+    name: f.originalname,
+  }));
 
   const data = await MessageService.send(
     (req as any).user.id,

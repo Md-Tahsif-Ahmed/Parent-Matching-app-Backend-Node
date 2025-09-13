@@ -17,10 +17,13 @@ export const ProfileValidation = {
     }),
   }),
 
-  // NEW: childAge only
-  setChildDOB: z.object({
+ setChildDOB: z.object({
     body: z.object({
-      childAge: z.date(),
+      // Accept ISO string or date; coerce to Date
+      childDOB: z.coerce.date({
+        required_error: 'childDOB is required',
+        invalid_type_error: 'childDOB must be a valid date',
+      }),
     }),
   }),
 

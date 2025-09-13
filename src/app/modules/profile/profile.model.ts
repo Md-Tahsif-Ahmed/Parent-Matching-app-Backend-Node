@@ -67,8 +67,33 @@ const ProfileSchema = new Schema<IProfile>(
     completion: { type: Number, default: 0 }, // 0–100
     consentAt: { type: Date },
   },
-  { timestamps: true }
+  { timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true } }
+   
+     
 );
+
+// --- Virtual Age (years, months, totalMonths)
+function diffYM(from: Date, to: Date) {
+  // দিন/সময় ইগনোর করতে local date slice নাও
+  const f = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const t = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+
+  let totalMonths = (t.getFullYear() - f.getFullYear()) * 12 + (t.getMonth() - f.getMonth());
+  if (t.getDate() < f.getDate()) totalMonths -= 1; // পুরো মাস না হলে আগের মাস হিসাবে ধরা
+
+  const years = Math.max(0, Math.floor(totalMonths / 12));
+  const months = Math.max(0, totalMonths % 12);
+  totalMonths = Math.max(0, totalMonths);
+
+  return { years, months, totalMonths };
+}
+
+ProfileSchema.virtual('childAge').get(function (this: IProfile) {
+  if (!this.childDOB) return null;
+  return diffYM(this.childDOB, new Date());
+});
 
 // optional indexes for quick search/filter
 ProfileSchema.index({ 'diagnosis.name': 1 });

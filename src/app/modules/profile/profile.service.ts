@@ -41,14 +41,23 @@ const setAboutMe = async (userId: UserId, aboutMe: string) => {
 };
 
 // NEW: childAge only
-const setChildAge = async (userId: UserId, childAge: number) => {
+const setChildDOB = async (userId: string, childDOB: Date) => {
+  // basic guardrails
+  const now = new Date();
+  if (childDOB > now) {
+    throw new Error('childDOB cannot be in the future');
+  }
+
   const p = await Profile.findOneAndUpdate(
     { user: userId },
-    { $set: { childAge } },
+    { $set: { childDOB } },
     { new: true, upsert: true }
-  );
-  return finalizeAndReturn(p);
+  ).lean({ virtuals: true }); // so childAge virtual comes through
+
+  // If you didn't enable virtuals, compute manually here and merge.
+  return p;
 };
+
 
 const setJourney = async (userId: UserId, journeyName: string) => {
   const p = await Profile.findOneAndUpdate(
@@ -336,7 +345,7 @@ const deletePhoto = async (
 export const ProfileService = {
   me,
   setAboutMe,
-  setChildAge,
+  setChildDOB,
   setJourney,
   setInterestsValues,
   setDiagnoses,

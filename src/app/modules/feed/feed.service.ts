@@ -7,6 +7,17 @@ import { NoShowPairModel } from "../match/noShowPair.model";
 
 type ObjId = Types.ObjectId | string;
 
+// --- helper: month diff (date-only, timezone-safe-ish)
+function monthsBetween(d: Date, t = new Date()) {
+  const from = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const to = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  let m =
+    (to.getFullYear() - from.getFullYear()) * 12 +
+    (to.getMonth() - from.getMonth());
+  if (to.getDate() < from.getDate()) m -= 1;
+  return Math.max(0, m);
+}
+
 export const FeedService = {
   /**
    * Feed builder with:
@@ -65,7 +76,7 @@ export const FeedService = {
         diagnosis: 1,
         therapy: 1,
         journeyName: 1,
-        childAge: 1,
+        childDOB: 1,
         completion: 1,
       }),
     ]);
@@ -121,8 +132,16 @@ export const FeedService = {
       ? String((myProf as any).diagnosis.type).toLowerCase()
       : null;
 
-    const myChildAge =
-      typeof myProf?.childAge === "number" ? myProf!.childAge : null;
+    // new: add
+
+    // ✅ compute my child's age in months from DOB
+    const myChildAgeMonths =
+      myProf?.childDOB instanceof Date
+        ? monthsBetween(myProf.childDOB)
+        : myProf?.childDOB
+        ? monthsBetween(new Date(myProf.childDOB))
+        : null;
+
     const myComplPct = Math.round(
       typeof myProf?.completion === "number" ? myProf!.completion : 0
     ); // 0..100
@@ -144,6 +163,11 @@ export const FeedService = {
     const prefTargets = myJourneyName
       ? journeyPrefMap[myJourneyName] ?? []
       : [];
+
+    // ✅ ADD HERE (before coordsOk / pipeline.push)
+    const myJourneyLower = myJourneyName ? myJourneyName.toLowerCase() : null;
+    const prefTargetsLower = prefTargets.map((s) => s.toLowerCase());
+    const myDiagNameLower = myDiagName ? myDiagName.toLowerCase() : null;
 
     // geo available?
     const coordsOk =
@@ -188,10 +212,8 @@ export const FeedService = {
     // --- Stage A: normalize fields for scoring ---
     pipeline.push({
       $addFields: {
-        // candidate completion normalized
         complNorm: { $divide: ["$completion", 100] },
 
-        // lowercase arrays for case-insensitive set ops
         interestsLower: {
           $map: {
             input: { $ifNull: ["$interests", []] },
@@ -214,7 +236,6 @@ export const FeedService = {
           },
         },
 
-        diagnosisName: { $ifNull: ["$diagnosis.name", ""] },
         diagnosisTypeLower: {
           $toLower: {
             $ifNull: [
@@ -224,16 +245,78 @@ export const FeedService = {
           },
         },
 
-        // NEW: journey preference target(s) + inbound-like boost
-        _prefTargets: prefTargets,
+        // ✅ নতুন: এগুলা দিয়েই ম্যাচ করবো
+        journeyNameLower: { $toLower: { $ifNull: ["$journeyName", ""] } },
+        diagnosisNameLower: { $toLower: { $ifNull: ["$diagnosis.name", ""] } },
+
+        // FE constants inject
+        _prefTargetsLower: prefTargetsLower,
         _likedMeIds: likedMeIds,
       },
     });
 
+    // ✅ Stage A.1: candidate age in months from DOB (Mongo 5+: $dateDiff)
+    pipeline.push({
+      $addFields: {
+        candidateAgeMonths: {
+          $cond: [
+            { $ne: ["$childDOB", null] },
+            {
+              $dateDiff: {
+                startDate: "$childDOB",
+                endDate: "$$NOW",
+                unit: "month",
+              },
+            },
+            null,
+          ],
+        },
+      },
+    });
+
+
+    // ...............*****.....................
+    // ...............*****.....................
+
+ 
+
+pipeline.push({
+  $match: {
+    $expr: {
+      $or: [
+        // interests overlap
+        { $gt: [ { $size: { $setIntersection: ["$interestsLower", myInterestsLower] } }, 0 ] },
+        // values overlap
+        { $gt: [ { $size: { $setIntersection: ["$valuesLower", myValuesLower] } }, 0 ] },
+        // exact journey (case-insensitive)
+        (myJourneyLower ? { $eq: ["$journeyNameLower", myJourneyLower] } : { $literal: false }),
+        // journey affinity (non-exact list)
+        { $in: ["$journeyNameLower", "$_prefTargetsLower"] },
+        // diagnosis / therapy exact (case-insensitive)
+        (myDiagNameLower ? { $eq: ["$diagnosisNameLower", myDiagNameLower] } : { $literal: false }),
+        (myTherapyLower   ? { $eq: ["$therapyNameLower",   myTherapyLower]   } : { $literal: false }),
+        // age within ±AGE_TOL_MONTHS
+        (myChildAgeMonths !== null ? {
+          $and: [
+            { $ne: ["$candidateAgeMonths", null] },
+            { $lte: [ { $abs: { $subtract: ["$candidateAgeMonths", myChildAgeMonths] } }, 6 ] }
+          ]
+        } : { $literal: false }),
+        // inbound like = always allow
+        { $in: ["$user", "$_likedMeIds"] }
+      ]
+    }
+  }
+});
+
+
+    // ...............*****.....................
+    // ...............*****.....................
+
     // --- Stage B: compute scores ---
     pipeline.push({
       $addFields: {
-        // Jaccard similarity for interests
+        // interests Jaccard
         interestScore: {
           $let: {
             vars: {
@@ -256,7 +339,7 @@ export const FeedService = {
           },
         },
 
-        // Jaccard similarity for values
+        // values Jaccard
         valueScore: {
           $let: {
             vars: {
@@ -277,32 +360,38 @@ export const FeedService = {
           },
         },
 
-        // journey / diagnosis exact name match (only if mine present)
-        journeyScore: myJourneyName
-          ? { $cond: [{ $eq: ["$journeyName", myJourneyName] }, 1, 0] }
-          : 0,
-        diagScore: myDiagName
-          ? { $cond: [{ $eq: ["$diagnosisName", myDiagName] }, 1, 0] }
+        // ✅ case-insensitive exact matches
+        journeyScore: myJourneyLower
+          ? { $cond: [{ $eq: ["$journeyNameLower", myJourneyLower] }, 1, 0] }
           : 0,
 
-        // therapy exact name match (single 'therapy' object assumed)
+        diagScore: myDiagNameLower
+          ? { $cond: [{ $eq: ["$diagnosisNameLower", myDiagNameLower] }, 1, 0] }
+          : 0,
+
         therapyScore: myTherapyLower
           ? { $cond: [{ $eq: ["$therapyNameLower", myTherapyLower] }, 1, 0] }
           : 0,
 
-        // NEW: typeName/type matching (lower weight; works even if name doesn't match)
+        // type matches (already lowercased)
         diagTypeScore: myDiagTypeLower
           ? { $cond: [{ $eq: ["$diagnosisTypeLower", myDiagTypeLower] }, 1, 0] }
           : 0,
+
         therapyTypeScore: myTherapyTypeLower
           ? {
               $cond: [{ $eq: ["$therapyTypeLower", myTherapyTypeLower] }, 1, 0],
             }
           : 0,
 
-        // childAge proximity: within 6 months (only if my age present)
+        // ✅ journey affinity (case-insensitive, non-exact)
+        journeyAffinity: {
+          $cond: [{ $in: ["$journeyNameLower", "$_prefTargetsLower"] }, 1, 0],
+        },
+
+        // age proximity (DOB→months)
         ageScore:
-          myChildAge !== null
+          myChildAgeMonths !== null
             ? {
                 $cond: [
                   {
@@ -310,8 +399,8 @@ export const FeedService = {
                       {
                         $abs: {
                           $subtract: [
-                            { $ifNull: ["$childAge", 9999] },
-                            myChildAge,
+                            { $ifNull: ["$candidateAgeMonths", 9999] },
+                            myChildAgeMonths,
                           ],
                         },
                       },
@@ -324,20 +413,13 @@ export const FeedService = {
               }
             : 0,
 
-        // completion similarity to me (0..1): closer => higher
+        // completion similarity
         complAffinity: {
           $subtract: [1, { $abs: { $subtract: ["$complNorm", myComplNorm] } }],
         },
 
-        // NEW: Journey-bias preference (non-exact, separate from exact match)
-        journeyAffinity: {
-          $cond: [{ $in: ["$journeyName", "$_prefTargets"] }, 1, 0],
-        },
-
-        // NEW: Inbound LIKE soft boost (if candidate liked me)
-        inboundLiked: {
-          $cond: [{ $in: ["$user", "$_likedMeIds"] }, 1, 0],
-        },
+        // inbound like soft boost
+        inboundLiked: { $cond: [{ $in: ["$user", "$_likedMeIds"] }, 1, 0] },
       },
     });
 

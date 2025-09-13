@@ -38,7 +38,7 @@ const userSchema = new Schema<IUser, UserModal>(
       trim: true,
     },
 
-    dob: { type: Date, required: true }, 
+    dob: { type: Date, required: false }, 
 
     password: {
       type: String,

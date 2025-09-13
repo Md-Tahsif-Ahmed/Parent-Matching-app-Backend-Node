@@ -29,13 +29,14 @@ const setAboutMe = catchAsync(async (req: Request, res: Response) => {
 });
 
 // NEW: childAge only
-const setChildAge = catchAsync(async (req: Request, res: Response) => {
-  const profile = await ProfileService.setChildAge(req.user.id, req.body.childAge);
+const setChildDOB = catchAsync(async (req, res) => {
+  const profile = await ProfileService.setChildDOB(req.user.id, req.body.childDOB);
+
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Child age updated',
-    data: profile,
+    message: 'Child DOB updated',
+    data: profile, // includes virtual childAge if virtuals enabled
   });
 });
 
@@ -222,7 +223,7 @@ const deletePhoto = catchAsync(async (req: Request, res: Response) => {
 export const ProfileController = {
   me,
   setAboutMe,    // NEW
-  setChildAge,   // NEW
+  setChildDOB,   // NEW
   setJourney,
   setInterestsValues,
   setDiagnoses,

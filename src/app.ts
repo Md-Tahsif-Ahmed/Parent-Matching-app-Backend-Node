@@ -10,6 +10,7 @@ import { MatchRoutes } from "./app/modules/match/match.routes";
 import { MessageRoutes } from "./app/modules/message/message.routes";
 import { ConversationRoutes } from "./app/modules/conversation/conversation.routes";
 import { BlockRoutes } from "./app/modules/block/block.routes";
+import path from "path";
 const app = express();
 
 // morgan
@@ -23,7 +24,20 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 //file retrieve
-app.use(express.static('uploads'));
+// app.use(express.static('uploads'));
+ 
+const UPLOAD_ROOT = process.env.UPLOAD_ROOT || path.resolve(process.cwd(), "uploads");
+app.use(
+  "/uploads",
+  express.static(UPLOAD_ROOT, {
+    maxAge: "1y",
+    etag: true,
+    // (ঐচ্ছিক) কাস্টম হেডার:
+    setHeaders(res) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    },
+  })
+);
 
 // Session middleware (must be before passport initialization)
 app.use(session({
