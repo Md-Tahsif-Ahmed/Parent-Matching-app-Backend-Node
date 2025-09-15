@@ -23,5 +23,32 @@ export const BlockService = {
   async unblock(me: ObjId, target: ObjId) {
     await BlockModel.deleteOne({ by: me, user: target });
     return { blocked: false };
-  }
+  },
+
+  async listMine(me: ObjId, page = 1, limit = 20) {
+    const skip = (Math.max(page, 1) - 1) * Math.max(limit, 1);
+
+    const [items, total] = await Promise.all([
+      BlockModel.find({ by: me })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate({
+        path: 'user',
+        select: '_id name',  
+        options: { lean: true }  
+      } ).lean(),
+      BlockModel.countDocuments({ by: me }),
+    ]);
+
+    return {
+      items, // [{ _id, by, user: { _id, name}, createdAt, ... }]
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit) || 1,
+      },
+    };
+  },
 };

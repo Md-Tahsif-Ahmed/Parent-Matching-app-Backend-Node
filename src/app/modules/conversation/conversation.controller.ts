@@ -17,8 +17,18 @@ const archive = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const myList = catchAsync(async (req: Request, res: Response) => {
-  const data = await ConversationService.myList((req as any).user.id);
+const matchList = catchAsync(async (req: Request, res: Response) => {
+  const data = await ConversationService.matchList((req as any).user.id);
+  return sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "OK",
+    data,
+  });
+});
+
+const myActiveList = catchAsync(async (req: Request, res: Response) => {
+  const data = await ConversationService.myActiveList((req as any).user.id);
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
@@ -37,4 +47,15 @@ const recent = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-export const ConversationController = { archive, myList, recent };
+const archivedList = catchAsync(async (req: Request, res: Response) => {
+  const me = (req as any).user?.id;
+  const data = await ConversationService.archivedListWithProfiles(me);
+  return sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Archived conversations",
+    data,
+  });
+});
+
+export const ConversationController = { archive, matchList, myActiveList, recent, archivedList };

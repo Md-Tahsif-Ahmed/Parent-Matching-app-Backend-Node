@@ -6,8 +6,10 @@ import { ConversationController } from "./conversation.controller";
 const router = express.Router();
 router.use(auth(USER_ROLES.USER, USER_ROLES.ADMIN, USER_ROLES.SUPER_ADMIN));
 
-router.get("/list", ConversationController.myList);
+router.get("/match", ConversationController.matchList);
+router.get("/list", ConversationController.myActiveList);
 router.get("/recent", ConversationController.recent);
 router.patch("/:id/archive", ConversationController.archive);
+router.get("/archived", ConversationController.archivedList);
 
 export const ConversationRoutes = router;
