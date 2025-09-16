@@ -11,7 +11,7 @@ export const NotificationService = {
     const limit = Math.min(100, Math.max(1, Number(opts.limit || 20)));
     const skip  = (page - 1) * limit;
 
-    // কোনো কোনো JWT-তে id এর বদলে sub থাকে—সেই কেসে ফ্যালব্যাক
+    //  user.id or user.sub (for different token types)
     const userId = (user as any)?.id || (user as any)?.sub;
 
     const [items, total, unreadCount] = await Promise.all([
@@ -19,7 +19,7 @@ export const NotificationService = {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .select("text screen referenceId read createdAt sender") // প্রয়োজনীয় ফিল্ড
+        .select("text screen referenceId read createdAt sender")  
         .populate({ path: "sender", select: "name profile _id" })
         .lean({ virtuals: true }),
       Notification.countDocuments({ receiver: userId }),
@@ -46,17 +46,17 @@ export const NotificationService = {
   },
 
   // ADMIN:
-  async adminNotificationFromDB() {
-    return Notification.find({ type: "ADMIN" })
-      .sort({ createdAt: -1 })
-      .lean();
-  },
+  // async adminNotificationFromDB() {
+  //   return Notification.find({ type: "ADMIN" })
+  //     .sort({ createdAt: -1 })
+  //     .lean();
+  // },
 
-  async adminReadNotificationToDB() {
-    const res = await Notification.updateMany(
-      { type: "ADMIN", read: false },
-      { $set: { read: true } }
-    );
-    return { modified: res.modifiedCount ?? 0 };
-  },
+  // async adminReadNotificationToDB() {
+  //   const res = await Notification.updateMany(
+  //     { type: "ADMIN", read: false },
+  //     { $set: { read: true } }
+  //   );
+  //   return { modified: res.modifiedCount ?? 0 };
+  // },
 };

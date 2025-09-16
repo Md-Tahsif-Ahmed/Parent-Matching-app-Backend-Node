@@ -46,53 +46,67 @@ export const ConversationService = {
     return conv;
   },
 
-  async matchList(me: ObjId) {
-    return await ConversationModel.find({
-      "participants.user": me,
-      "participants.state": { $in: ["ACTIVE","PENDING"] },
-    }).sort({ updatedAt: -1 });
-  },
-
-  async myActiveList(me: ObjId) {
-  return await ConversationModel.find({
-    participants: {
-      $elemMatch: {
-        user: me,
-        state: "ACTIVE"  // Only include conversations where the user is ACTIVE
-      }
-    }
-  }).sort({ updatedAt: -1 });
-},
-
-  async recentMatches(me: ObjId) {
-    return await ConversationModel.find({ "participants.user": me })
-      .sort({ createdAt: -1 })
-      .limit(50);
-  },
-
-
-  //  my archived list (for cleanup)
-
-   // ...other methods,
-
-  /**
-   * Archived list (আমি আছি + কনভারসেশনে ARCHIVED আছে)
-   * partner এর name, profilePicture (Profile থেকে) জুড়ে দেয়
-   * যদি Profile.name না থাকে, fallback = User.name
-   */
-  async archivedListWithProfiles(me: ObjId) {
-    const meId = new Types.ObjectId(String(me));
-
-    const items = await ConversationModel.aggregate([
-      {
-        $match: {
-          "participants.user": meId,         // আমি participant
-          "participants.state": "ARCHIVED",  // কারো state ARCHIVED হলেই মিলবে
+async matchList(me: ObjId) {
+  const meId = new Types.ObjectId(String(me));
+  return await ConversationModel.aggregate([
+    // only conversations where *your* state is ACTIVE or PENDING
+    {
+      $match: {
+        participants: { $elemMatch: { user: meId, state: { $in: ["ACTIVE", "PENDING"] } } },
+      },
+    },
+    // pick the partner participant
+    {
+      $addFields: {
+        partner: {
+          $first: {
+            $filter: { input: "$participants", as: "p", cond: { $ne: ["$$p.user", meId] } },
+          },
         },
       },
-      // partner element বের করা (আমি বাদে যে user)
+    },
+    // FULL partner profile (no projection => all fields)
+    {
+      $lookup: {
+        from: "profiles",
+        localField: "partner.user",
+        foreignField: "user",
+        as: "profile",
+      },
+    },
+    { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } },
+
+    // final shape: ONLY core convo fields + profile
+    {
+      $project: {
+        _id: 1,
+        pairKey: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        profile: 1,             // full partner profile doc
+      },
+    },
+    { $sort: { updatedAt: -1 } },
+  ]);
+},
+
+
+  // --- MY ACTIVE LIST (same aggregation as archive but state=ACTIVE) ---
+  async myActiveList(me: ObjId) {
+    const meId = new Types.ObjectId(String(me));
+    return await ConversationModel.aggregate([
+      { $match: { participants: { $elemMatch: { user: meId, state: "ACTIVE" } } } },
       {
         $addFields: {
+          mePart: {
+            $first: {
+              $filter: {
+                input: "$participants",
+                as: "p",
+                cond: { $eq: ["$$p.user", meId] },
+              },
+            },
+          },
           partner: {
             $first: {
               $filter: {
@@ -104,21 +118,16 @@ export const ConversationService = {
           },
         },
       },
-      // partner.user -> Profile lookup
       {
         $lookup: {
-          from: "profiles",                // ⚠️ collection name নিশ্চিত করো
+          from: "profiles",
           localField: "partner.user",
           foreignField: "user",
           as: "partnerProfile",
-          pipeline: [
-            { $project: { _id: 1, user: 1, name: 1, profilePicture: 1 } } // name থাকলে নেবে
-          ],
+          pipeline: [{ $project: { _id: 1, user: 1, name: 1, profilePicture: 1 } }],
         },
       },
       { $unwind: { path: "$partnerProfile", preserveNullAndEmptyArrays: true } },
-
-      // fallback: profile.name না থাকলে User.name আনো
       {
         $lookup: {
           from: "users",
@@ -129,48 +138,216 @@ export const ConversationService = {
         },
       },
       { $unwind: { path: "$partnerUser", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          partnerName: { $ifNull: ["$partnerProfile.name", "$partnerUser.name"] },
+          partnerAvatarUrl: "$partnerProfile.profilePicture.url",
+        },
+      },
+      // last message (+ deliveredAt)
+      {
+        $lookup: {
+          from: "messages",
+          let: { convId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$conv", "$$convId"] } } },
+            { $sort: { createdAt: -1 } },
+            { $limit: 1 },
+            {
+              $project: {
+                _id: 1,
+                text: 1,
+                files: 1,
+                type: 1,
+                sender: 1,
+                createdAt: 1,
+                deliveredAt: 1,
+              },
+            },
+          ],
+          as: "lastMessage",
+        },
+      },
+      { $addFields: { lastMessage: { $first: "$lastMessage" } } },
+      {
+        $project: {
+          _id: 1,
+          pairKey: 1,
+          lastMessage: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          partner: {
+            _id: "$partner.user",
+            state: "$partner.state",
+            name: "$partnerName",
+            avatar: "$partnerAvatarUrl",
+          },
+          isArchived: { $literal: false },
+          canSend: { $eq: ["$mePart.state", "ACTIVE"] },
+        },
+      },
+      { $sort: { updatedAt: -1 } },
+    ]);
+  },
 
-      // name = profile.name ?? user.name
-    {
-  $addFields: {
-    partnerName: { $ifNull: ["$partnerProfile.name", "$partnerUser.name"] },
-    partnerAvatarUrl: "$partnerProfile.profilePicture.url",
-    isArchived: true,
-    canSend: false
-  }
-},
 
-{
-  $project: {
-    _id: 1,
-    pairKey: 1,
-    lastMessageAt: 1,
-    createdAt: 1,
-    updatedAt: 1,
-    partner: {
-      _id: "$partner.user",
-      state: "$partner.state",
-      name: "$partnerName",
-      avatar: "$partnerAvatarUrl",
-    },
-    isArchived: 1,
-    canSend: 1
-  }
-},
- 
-      
+  //  my archived list
+
+ // --- ARCHIVED LIST (with last message + deliveredAt) ---
+  async archivedListWithProfiles(me: ObjId) {
+    const meId = new Types.ObjectId(String(me));
+
+    const items = await ConversationModel.aggregate([
+      // only convos where *my* state is ARCHIVED
+      { $match: { participants: { $elemMatch: { user: meId, state: "ARCHIVED" } } } },
+
+      {
+        $addFields: {
+          mePart: {
+            $first: {
+              $filter: {
+                input: "$participants",
+                as: "p",
+                cond: { $eq: ["$$p.user", meId] },
+              },
+            },
+          },
+          partner: {
+            $first: {
+              $filter: {
+                input: "$participants",
+                as: "p",
+                cond: { $ne: ["$$p.user", meId] },
+              },
+            },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: "profiles",
+          localField: "partner.user",
+          foreignField: "user",
+          as: "partnerProfile",
+          pipeline: [{ $project: { _id: 1, user: 1, name: 1, profilePicture: 1 } }],
+        },
+      },
+      { $unwind: { path: "$partnerProfile", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "partner.user",
+          foreignField: "_id",
+          as: "partnerUser",
+          pipeline: [{ $project: { _id: 1, name: 1 } }],
+        },
+      },
+      { $unwind: { path: "$partnerUser", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          partnerName: { $ifNull: ["$partnerProfile.name", "$partnerUser.name"] },
+          partnerAvatarUrl: "$partnerProfile.profilePicture.url",
+        },
+      },
+
+      // last message (+ deliveredAt)
+      {
+        $lookup: {
+          from: "messages",
+          let: { convId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$conv", "$$convId"] } } },
+            { $sort: { createdAt: -1 } },
+            { $limit: 1 },
+            {
+              $project: {
+                _id: 1,
+                text: 1,
+                files: 1,
+                type: 1,
+                sender: 1,
+                createdAt: 1,
+                deliveredAt: 1,
+              },
+            },
+          ],
+          as: "lastMessage",
+        },
+      },
+      { $addFields: { lastMessage: { $first: "$lastMessage" } } },
+
+      {
+        $project: {
+          _id: 1,
+          pairKey: 1,
+          lastMessage: 1,            // { text, createdAt, deliveredAt, ... }
+          createdAt: 1,
+          updatedAt: 1,
+          partner: {
+            _id: "$partner.user",
+            state: "$partner.state",
+            name: "$partnerName",
+            avatar: "$partnerAvatarUrl",
+          },
+          isArchived: { $eq: ["$mePart.state", "ARCHIVED"] },
+          canSend: { $literal: false },
+        },
+      },
       { $sort: { updatedAt: -1 } },
     ]);
 
-    // // stringify ids for FE
-    // return items.map((x: any) => ({
-    //   ...x,
-    //   _id: String(x._id),
-    //   partner: x.partner
-    //     ? { ...x.partner, _id: String(x.partner._id) }
-    //     : null,
-    // }));
+    return items;
   },
 
+// --- RECENT MATCHES (just convId + partner profilePicture) ---
+   async recentMatches(me: ObjId) {
+  const meId = new Types.ObjectId(String(me));
+
+  return await ConversationModel.aggregate([
+    // I am a participant
+    { $match: { "participants.user": meId } },
+
+    // pick the partner participant (the one that's not me)
+    {
+      $addFields: {
+        partner: {
+          $first: {
+            $filter: { input: "$participants", as: "p", cond: { $ne: ["$$p.user", meId] } },
+          },
+        },
+      },
+    },
+
+    // join partner -> profiles to get profilePicture
+    {
+      $lookup: {
+        from: "profiles",                  
+        localField: "partner.user",
+        foreignField: "user",
+        as: "partnerProfile",
+        pipeline: [{ $project: { _id: 1, user: 1, profilePicture: 1 } }],
+      },
+    },
+    { $unwind: { path: "$partnerProfile", preserveNullAndEmptyArrays: true } },
+
+    // final shape (includes the raw object + a ready URL if present)
+    {
+      $project: {
+        _id: 1,
+        pairKey: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        partner: {
+          _id: "$partner.user",
+          // profilePicture: "$partnerProfile.profilePicture",
+          avatar: "$partnerProfile.profilePicture.url",
+        },
+      },
+    },
+
+    { $sort: { createdAt: -1 } },
+    { $limit: 50 },
+  ]);
+}
 
 };

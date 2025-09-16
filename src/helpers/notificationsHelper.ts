@@ -62,6 +62,6 @@ export const sendNotifications = async (data: any): Promise<INotification> => {
     io.to(`user:${data?.receiver}`).emit("notif:new", populated);
   }
 
-  // সার্ভিস রিটার্নেও populate থাকা ভালো
+  // SEND POPULATED
   return populated as any;
 };

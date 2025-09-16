@@ -21,18 +21,18 @@ const userSchema = new Schema<IUser, UserModal>(
     lastName:  { type: String, required: false, trim: true },
     name:      { type: String, required: false, trim: true },
      
-    appId: { type: String },
+    // appId: { type: String },
 
     role: {
       type: String,
       enum: Object.values(USER_ROLES),
       required: true,
-      default: USER_ROLES.USER,          // ✅ parent default
+      default: USER_ROLES.USER,           
     },
 
     email: {
       type: String,
-      required: true,                    // ✅ required
+      required: true,                     
       unique: true,
       lowercase: true,
       trim: true,
@@ -42,7 +42,7 @@ const userSchema = new Schema<IUser, UserModal>(
 
     password: {
       type: String,
-      required: true,                    // ✅ required
+      required: true,                    
       select: 0,
       minlength: 8,
     },
@@ -61,6 +61,11 @@ userSchema.virtual("profile", {
   foreignField: "user",
   justOne: true,
 });
+// avatar virtual (from profile)
+userSchema.virtual('avatar').get(function (this: any) {
+  return this?.profile?.profilePicture?.url ?? null;
+});
+
 userSchema.set("toJSON", { virtuals: true });
 userSchema.set("toObject", { virtuals: true });
 
@@ -106,23 +111,32 @@ userSchema.pre('save', function(next) {
 });
 
 // name auto-compose (findOneAndUpdate)
-userSchema.pre('findOneAndUpdate', function(next) {
-  // @ts-ignore
-  const update = this.getUpdate() ?? {};
-  if (
-    (!('name' in update) || !(update as any)?.name) &&
-    (('firstName' in update && (update as any)?.firstName) || ('lastName' in update && (update as any)?.lastName))
-  ) {
-    const first = (update as any)?.firstName ?? this.get('firstName');
-    const last  = (update as any)?.lastName ?? this.get('lastName');
+
+userSchema.pre('findOneAndUpdate', function (next) {
+  // get raw update object
+  const update: any = this.getUpdate() ?? {};
+
+  // if no $set, then consider the root object as $set
+  const setObj = update.$set ?? update;
+
+  const first = setObj.firstName;
+  const last  = setObj.lastName;
+
+  if ((!('name' in setObj) || !setObj.name) && (first || last)) {
     const composed = [first, last].filter(Boolean).join(' ').trim();
     if (composed) {
-      // @ts-ignore
-      this.setUpdate({ ...update, name: composed });
+      // keep old update keys, but ensure $set exists
+      this.setUpdate({
+        ...update,
+        $set: { ...setObj, name: composed }
+      });
     }
   }
+
   next();
 });
+
+
 
 
 export const User = model<IUser, UserModal>("User", userSchema);

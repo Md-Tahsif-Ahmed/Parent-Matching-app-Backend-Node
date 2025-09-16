@@ -7,5 +7,7 @@ const BlockSchema = new Schema<IBlock>({
 }, { timestamps: true });
 
 BlockSchema.index({ by:1, user:1 }, { unique: true });
+users: { _id: 1 }
+profiles: { user: 1 }
 
 export const BlockModel = model<IBlock>('Block', BlockSchema);
