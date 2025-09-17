@@ -6,7 +6,7 @@ export type INotification = {
     read: boolean;
     referenceId?: string;
     screen?: "MATCH" | "LIKE" | "CHAT";
-    type?: "ADMIN";
+    // type?: "ADMIN";
     sender?: Types.ObjectId | string;
 };
 

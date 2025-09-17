@@ -13,7 +13,7 @@ export type IUser = {
   name?: string;                 
   appId?: string;
   role: USER_ROLES;
-  dob: Date;
+  dob?: Date;
   email: string;
   password: string;               
   verified: boolean;

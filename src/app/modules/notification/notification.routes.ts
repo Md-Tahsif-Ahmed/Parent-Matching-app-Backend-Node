@@ -9,9 +9,9 @@ router.get('/',
     NotificationController.getNotificationFromDB
 );
 
-router.patch('/',
+router.patch('/:id/read',
     auth(USER_ROLES.USER),
-    NotificationController.readNotification
+    NotificationController.readOneNotification
 );
 
 // router.get('/admin',

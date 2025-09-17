@@ -8,8 +8,6 @@ import { ConversationModel } from '../conversation/conversation.model';
 import { SLOT_LIMIT, DEFAULT_COOLING_DAYS, pairKeyOf } from './types';
 import { sendNotifications } from '../../../helpers/notificationsHelper';
 import { emitToUser } from '../../../helpers/realtime';
-import { MessageService } from '../message/message.service'; // উপরে একবার যোগ করো
-import { IAttachment } from '../message/message.interface';
 
 type ObjId = Types.ObjectId | string;
 
@@ -21,7 +19,6 @@ async function isBlocked(a: ObjId, b: ObjId) {
 export const MatchService = {
   // LIKE: create/update like; if reciprocal, ensure conversation exists and notify both
   async like(me: ObjId, target: ObjId) {
-    console.log("++++++", me, target);
     if (String(me) === String(target))
       throw new ApiError(StatusCodes.BAD_REQUEST, 'SELF_LIKE_NOT_ALLOWED');
 
@@ -40,15 +37,15 @@ export const MatchService = {
       }
     );
 
-    const wasCreated = !raw?.lastErrorObject?.updatedExisting;   // newly inserted
-    const prevType   = raw?.value?.type;                         // previous type if existed
+    const wasCreated = !raw?.lastErrorObject?.updatedExisting;  
+    const prevType   = raw?.value?.type;   
     const transitionedToLike = wasCreated || prevType !== 'LIKE';
 
     // Check reciprocal
     const hasReciprocal = await LikeModel.exists({ from: target, to: me, type: 'LIKE' });
 
     if (!hasReciprocal) {
-      // ✅ Non-reciprocal case:
+   
       // - Realtime ping (only once when newly LIKE’d)
       // - Persisted notification so offline user also sees it later
       if (transitionedToLike) {
@@ -58,10 +55,10 @@ export const MatchService = {
 
         // Persisted notif (sender populated in NotificationService.getNotificationFromDB)
         await sendNotifications({
-          text: "Someone liked your profile ❤️",
+          text: "Someone Liked you!",
           receiver: target,
-          referenceId: String(me),   // you may use senderId here for deep-linking to profile
-          screen: "CHAT",            // keeping "CHAT" for consistency with your schema
+          referenceId: String(me),  
+          screen: "LIKE",           
           read: false,
           sender: me,
         });
@@ -85,18 +82,18 @@ export const MatchService = {
 
     // Persisted notif to both
     await sendNotifications({
-      text: "It's a match! Say hello 👋",
+      text: "You have one new match!",
       receiver: target,
       referenceId: String(conv._id),
-      screen: "CHAT",
+      screen: "MATCH",
       read: false,
       sender: me,
     });
     await sendNotifications({
-      text: "It's a match! Say hello 👋",
+      text: "You have one new match!",
       receiver: me,
       referenceId: String(conv._id),
-      screen: "CHAT",
+      screen: "MATCH",
       read: false,
       sender: target,
     });

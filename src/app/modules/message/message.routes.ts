@@ -12,7 +12,7 @@ const MessageReq = z.object({
 
 const router = express.Router();
 
-// USER / ADMIN / SUPER_ADMIN— তিন রোলই পারবে
+ 
 router.use(auth(USER_ROLES.USER, USER_ROLES.ADMIN, USER_ROLES.SUPER_ADMIN));
 
 // list
@@ -26,8 +26,8 @@ router.post(
   MessageController.send
 );
 
-// NEW: chat opened ⇒ mark all not-seen as seen
-router.post(
+// chat opened ⇒ mark all not-seen message  as  a seen
+router.patch(
   "/:convId/seen",
   validateRequest(MessageReq),
   MessageController.seen

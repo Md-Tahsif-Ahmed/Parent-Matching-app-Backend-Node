@@ -59,8 +59,6 @@ const ProfileSchema = new Schema<IProfile>(
     interests: { type: [String], default: [] },
     values: { type: [String], default: [] },
 
-    // diagnoses: { type: [SimpleKVSchema], default: [] },
-    // therapies: { type: [SimpleKVSchema], default: [] },
     diagnosis: { type: SimpleKVSchema, required: false },
     therapy: { type: SimpleKVSchema, required: false },
 
@@ -76,12 +74,12 @@ const ProfileSchema = new Schema<IProfile>(
 
 // --- Virtual Age (years, months, totalMonths)
 function diffYM(from: Date, to: Date) {
-  // দিন/সময় ইগনোর করতে local date slice নাও
+ 
   const f = new Date(from.getFullYear(), from.getMonth(), from.getDate());
   const t = new Date(to.getFullYear(), to.getMonth(), to.getDate());
 
   let totalMonths = (t.getFullYear() - f.getFullYear()) * 12 + (t.getMonth() - f.getMonth());
-  if (t.getDate() < f.getDate()) totalMonths -= 1; // পুরো মাস না হলে আগের মাস হিসাবে ধরা
+  if (t.getDate() < f.getDate()) totalMonths -= 1;  
 
   const years = Math.max(0, Math.floor(totalMonths / 12));
   const months = Math.max(0, totalMonths % 12);

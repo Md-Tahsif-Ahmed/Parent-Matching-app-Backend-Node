@@ -28,8 +28,8 @@ const send = catchAsync(async (req: Request, res: Response) => {
   const uploads = pickFiles();
 
   // MessageModel schema → { url, mime, size, name }
-  // diskStorage হলে f.path থাকবে -> /uploads/... বানাই
-  // memoryStorage হলে fallback হিসেবে data URL
+  // diskStorage f.path -> /uploads/...
+  // memoryStorage  fallback  data URL
   const files = uploads.map((f) => {
     const fileAny = f as any;
     if (fileAny.path && typeof fileAny.path === "string") {
@@ -90,7 +90,7 @@ const list = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// NEW: SEEN (চ্যাট ওপেন হলে bulk seen)
+// NEW: SEEN (bulk seen)
 const seen = catchAsync(async (req: Request, res: Response) => {
   const data = await MessageService.markSeen(
     (req as any).user.id,

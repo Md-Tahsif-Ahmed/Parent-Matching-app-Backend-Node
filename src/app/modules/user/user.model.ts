@@ -69,7 +69,7 @@ userSchema.virtual('avatar').get(function (this: any) {
 userSchema.set("toJSON", { virtuals: true });
 userSchema.set("toObject", { virtuals: true });
 
-// ইউনিক ইমেইল ইনডেক্স নিশ্চিত
+// ------- Indexes -------
 userSchema.index({ email: 1 }, { unique: true });
 
 // ------- Statics -------
