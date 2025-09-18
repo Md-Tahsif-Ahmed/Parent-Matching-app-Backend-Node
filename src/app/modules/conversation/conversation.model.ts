@@ -18,7 +18,7 @@ const ConversationSchema = new Schema<IConversation>(
   { timestamps: true }
 );
 
-/** ✅ Useful indexes */
+/** Useful indexes */
 ConversationSchema.index({ 'participants.user': 1 });
 ConversationSchema.index({ 'participants.user': 1, 'participants.state': 1, updatedAt: -1 });
 ConversationSchema.index({ 'participants.user': 1, createdAt: -1 });

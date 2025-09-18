@@ -6,7 +6,6 @@ import { z } from "zod";
 import { MatchController } from "./match.controller";
 // import { upload } from "../../middlewares/messageUploads";
 
-// Mongo ObjectId সাধারণত 24-চর—তাই min(24) করা ভালো
 const LikeReq = z.object({
   params: z.object({ userId: z.string().min(24) }),
 });

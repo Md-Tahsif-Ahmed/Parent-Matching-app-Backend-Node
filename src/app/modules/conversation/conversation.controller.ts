@@ -17,8 +17,17 @@ const archive = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const matchList = catchAsync(async (req: Request, res: Response) => {
-  const data = await ConversationService.matchList((req as any).user.id);
+export const matchList = catchAsync(async (req: Request, res: Response) => {
+  const me = (req as any).user.id;
+
+  const { page, limit, searchTerm } = req.query;
+
+  const data = await ConversationService.matchList(me, {
+    page: page ? Number(page) : undefined,
+    limit: limit ? Number(limit) : undefined,
+    searchTerm: searchTerm ? String(searchTerm) : undefined,
+  });
+
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
@@ -27,8 +36,19 @@ const matchList = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const myActiveList = catchAsync(async (req: Request, res: Response) => {
-  const data = await ConversationService.myActiveList((req as any).user.id);
+export const myActiveList = catchAsync(async (req: Request, res: Response) => {
+  const me = (req as any).user.id; // assuming auth middleware sets req.user
+
+  // Extract query params
+  const { page, limit, searchTerm } = req.query;
+
+  // Call service with query params
+  const data = await ConversationService.myActiveList(me, {
+    page: page ? Number(page) : undefined,
+    limit: limit ? Number(limit) : undefined,
+    searchTerm: searchTerm ? String(searchTerm) : undefined,
+  });
+
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
@@ -36,6 +56,51 @@ const myActiveList = catchAsync(async (req: Request, res: Response) => {
     data,
   });
 });
+
+
+// const archivedList = catchAsync(async (req: Request, res: Response) => {
+//   const me = (req as any).user?.id;
+//   const { page, limit, searchTerm } = req.query;
+
+//   const data = await ConversationService.archivedListWithProfiles(me, {
+//     page: page ? Number(page) : undefined,
+//     limit: limit ? Number(limit) : undefined,
+//     searchTerm: searchTerm ? String(searchTerm) : undefined,
+//   });
+
+//   return sendResponse(res, {
+//     statusCode: StatusCodes.OK,
+//     success: true,
+//     message: "Archived conversations",
+//     data,
+//   });
+// });
+
+const archivedList = catchAsync(async (req: Request, res: Response) => {
+  const me = (req as any).user?.id;
+
+  let page = 1;
+  const limit = req.query.limit ? Number(req.query.limit) : 10;
+  const searchTerm = req.query.searchTerm ? String(req.query.searchTerm).trim() : undefined;
+
+  if (!searchTerm && req.query.page) {
+    page = Number(req.query.page) || 1;
+  }
+
+  const data = await ConversationService.archivedListWithProfiles(me, {
+    page,
+    limit,
+    searchTerm,
+  });
+
+  return sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: "Archived conversations",
+    data,
+  });
+});
+
 
 const recent = catchAsync(async (req: Request, res: Response) => {
   const data = await ConversationService.recentMatches((req as any).user.id);
@@ -47,15 +112,6 @@ const recent = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const archivedList = catchAsync(async (req: Request, res: Response) => {
-  const me = (req as any).user?.id;
-  const data = await ConversationService.archivedListWithProfiles(me);
-  return sendResponse(res, {
-    statusCode: StatusCodes.OK,
-    success: true,
-    message: "Archived conversations",
-    data,
-  });
-});
+
 
 export const ConversationController = { archive, matchList, myActiveList, recent, archivedList };
