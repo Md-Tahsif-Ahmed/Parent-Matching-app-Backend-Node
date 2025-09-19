@@ -37,7 +37,7 @@ const matchList = catchAsync(async (req: Request, res: Response) => {
   });
 
   return sendResponse(res, {
-    statusCode: StatusCodes.OK,
+    statusCode: StatusCodes.OK,                                                                                              
     success: true,
     message: "Matches list",
     data,

@@ -49,8 +49,7 @@ const updateUser = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-
-// --- aggregated object export (তোমার চাওয়া স্টাইলে) ---
+ 
 export const UserController = {
   getUserProfile,
   createUser,
