@@ -24,9 +24,10 @@ export default{
     },
 
     admin: {
-        email:process.env.ADMIN_EMAIL,
-        password: process.env.ADMIN_PASSWORD
-    },
+  email: process.env.SUPER_ADMIN_EMAIL,
+  password: process.env.SUPER_ADMIN_PASSWORD
+},
+
     twilio: {
         accountSid: process.env.TWILIO_ACCOUNT_SID,
         authToken: process.env.TWILIO_AUTH_TOKEN,

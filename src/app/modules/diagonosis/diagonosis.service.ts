@@ -1,8 +1,9 @@
 import { StatusCodes } from 'http-status-codes';
 import mongoose from 'mongoose';
 import ApiError from '../../../errors/ApiErrors';
-import { IDiagnosis } from './diagnosis.interface';
-import { Diagnosis } from './diagnosis.model';
+import { IDiagnosis } from './diagonosis.interface';
+import { Diagnosis } from './diagonosis.model';
+ 
 
 const createDiagnosisToDB = async (
   payload: IDiagnosis

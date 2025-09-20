@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
-import { DiagnosisService } from './diagnosis.service';
+import { DiagnosisService } from './diagonosis.service';
+ 
 
 const createDiagnosis = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;

@@ -1,51 +1,60 @@
 // profile.controller.ts
-import { Request, Response } from 'express';
-import catchAsync from '../../../shared/catchAsync';
-import sendResponse from '../../../shared/sendResponse';
-import { StatusCodes } from 'http-status-codes';
+import { Request, Response } from "express";
+import catchAsync from "../../../shared/catchAsync";
+import sendResponse from "../../../shared/sendResponse";
+import { StatusCodes } from "http-status-codes";
 
-import { ProfileService } from './profile.service';
-import ApiError from '../../../errors/ApiErrors';
+import { ProfileService } from "./profile.service";
+import ApiError from "../../../errors/ApiErrors";
 
 const me = catchAsync(async (req: Request, res: Response) => {
   const profile = await ProfileService.me(req.user.id);
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Profile fetched successfully',
+    message: "Profile fetched successfully",
     data: profile,
   });
 });
- 
+
 // NEW: aboutMe only
 const setAboutMe = catchAsync(async (req: Request, res: Response) => {
-  const profile = await ProfileService.setAboutMe(req.user.id, req.body.aboutMe);
+  const profile = await ProfileService.setAboutMe(
+    req.user.id,
+    req.body.aboutMe
+  );
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'About me updated',
+    message: "About me updated",
     data: profile,
   });
 });
 
 // NEW: childAge only
 const setChildDOB = catchAsync(async (req, res) => {
-  const profile = await ProfileService.setChildDOB(req.user.id, req.body.childDOB);
+  const profile = await ProfileService.setChildDOB(
+    req.user.id,
+    req.body.childDOB
+  );
 
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Child DOB updated',
+    message: "Child DOB updated",
     data: profile, // includes virtual childAge if virtuals enabled
   });
 });
 
 const setJourney = catchAsync(async (req: Request, res: Response) => {
-  const profile = await ProfileService.setJourney(req.user.id, req.body.journeyName);
+  const profile = await ProfileService.setJourney(
+    req.user.id,
+    req.body.journeyName
+  );
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Journey updated',
+    message: "Journey updated",
     data: profile,
   });
 });
@@ -59,7 +68,7 @@ const setInterestsValues = catchAsync(async (req: Request, res: Response) => {
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Interests/Values updated',
+    message: "Interests/Values updated",
     data: profile,
   });
 });
@@ -71,11 +80,11 @@ const setDiagnoses = catchAsync(async (req: Request, res: Response) => {
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Diagnosis updated',
+    message: "Diagnosis updated",
     data: profile,
   });
 });
- 
+
 const setTherapies = catchAsync(async (req: Request, res: Response) => {
   const bodyAny: any = req.body;
   const item = bodyAny?.item ?? bodyAny;
@@ -83,7 +92,7 @@ const setTherapies = catchAsync(async (req: Request, res: Response) => {
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Therapy updated',
+    message: "Therapy updated",
     data: profile,
   });
 });
@@ -98,7 +107,7 @@ const setLocation = catchAsync(async (req: Request, res: Response) => {
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Location saved',
+    message: "Location saved",
     data: profile,
   });
 });
@@ -108,7 +117,7 @@ const setConsent = catchAsync(async (req: Request, res: Response) => {
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Consent saved',
+    message: "Consent saved",
     data: profile,
   });
 });
@@ -130,7 +139,7 @@ const uploadProfilePicture = catchAsync(async (req, res) => {
   const r: any = req;
 
   // fields([{ name:'image' }]) => req.files.image[0]
-  // fallback রাখলাম যদি future এ single('image')/any() ইউজ করো
+  // kept fallback, if future single('image')/any() we do use
   const file =
     r?.files?.image?.[0] ??
     r?.file ??
@@ -143,15 +152,18 @@ const uploadProfilePicture = catchAsync(async (req, res) => {
     );
   }
 
-  const userId = (req as any).user?.id; // auth middleware যা বসায়
+  const userId = (req as any).user?.id; // auth middleware
 
-  const updatedProfile = await ProfileService.uploadProfilePicture(userId, file);
+  const updatedProfile = await ProfileService.uploadProfilePicture(
+    userId,
+    file
+  );
 
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Profile picture updated',
-    data: updatedProfile, // পুরো profile return করছি; চাইলে শুধু meta পাঠাতে পারো
+    message: "Profile picture updated",
+    data: updatedProfile,
   });
 });
 
@@ -178,7 +190,7 @@ const addPhoto = catchAsync(async (req: Request, res: Response) => {
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Photo added to gallery',
+    message: "Photo added to gallery",
     data: profile,
   });
 });
@@ -201,7 +213,7 @@ const replacePhoto = catchAsync(async (req: Request, res: Response) => {
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Photo replaced',
+    message: "Photo replaced",
     data: profile,
   });
 });
@@ -215,15 +227,15 @@ const deletePhoto = catchAsync(async (req: Request, res: Response) => {
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Photo removed',
+    message: "Photo removed",
     data: profile,
   });
 });
 
 export const ProfileController = {
   me,
-  setAboutMe,    // NEW
-  setChildDOB,   // NEW
+  setAboutMe,
+  setChildDOB,
   setJourney,
   setInterestsValues,
   setDiagnoses,

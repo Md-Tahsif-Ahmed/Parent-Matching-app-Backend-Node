@@ -1,12 +1,12 @@
-import { Document, Types } from 'mongoose';
+import { Document, Types } from "mongoose";
 
 export interface ISimpleKV {
-  typeName?: string;   // dropdown group (optional)
-  name: string;        // dropdown item OR free-text when "Others"
+  typeName?: string; // dropdown group (optional)
+  name: string; // dropdown item OR free-text when "Others"
 }
 
 export interface IGeoPoint {
-  type: 'Point';
+  type: "Point";
   coordinates: [number, number]; // [lng, lat]
 }
 
@@ -31,14 +31,10 @@ export interface IProfile extends Document {
   journeyName?: string;
   interests: string[];
   values: string[];
-
-  // diagnoses: ISimpleKV[];
-  // therapies: ISimpleKV[];
-   // ✅ singular (NOT arrays)
   diagnosis?: ISimpleKV;
   therapy?: ISimpleKV;
 
-  completion?: number;  // onboarding progress (0-100)
+  completion?: number; // onboarding progress (0-100)
   consentAt?: Date;
 
   createdAt: Date;

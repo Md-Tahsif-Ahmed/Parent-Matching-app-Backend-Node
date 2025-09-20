@@ -1,9 +1,11 @@
 import express from 'express';
 import auth from '../../middlewares/auth';
 import { USER_ROLES } from '../../../enums/user';
-import { DiagnosisController } from './diagnosis.controller';
+ 
 import validateRequest from '../../middlewares/validateRequest';
-import { DiagnosisValidation } from './diagnosis.validation';
+import { DiagnosisValidation } from './diagonosis.validation';
+import { DiagnosisController } from './diagonosis.controller';
+ 
 
 const router = express.Router();
 

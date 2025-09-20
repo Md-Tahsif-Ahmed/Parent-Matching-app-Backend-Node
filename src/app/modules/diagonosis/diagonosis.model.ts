@@ -1,5 +1,6 @@
 import { model, Schema } from 'mongoose';
-import { IDiagnosis, DiagnosisModel } from './diagnosis.interface';
+import { DiagnosisModel, IDiagnosis } from './diagonosis.interface';
+ 
 
 const diagnosisSchema = new Schema<IDiagnosis, DiagnosisModel>(
   {

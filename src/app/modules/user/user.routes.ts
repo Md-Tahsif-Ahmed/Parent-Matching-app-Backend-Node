@@ -12,12 +12,6 @@ router.get(
     UserController.getUserProfile
 );
   
-router.post(
-    '/create-admin',
-    validateRequest(UserValidation.createAdminZodSchema),
-    UserController.createAdmin
-);
-
 router
     .route('/')
     .post(

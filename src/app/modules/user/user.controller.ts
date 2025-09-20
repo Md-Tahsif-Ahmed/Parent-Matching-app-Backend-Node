@@ -27,16 +27,7 @@ const createUser = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// POST /users/admin
-const createAdmin = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserService.createAdminToDB(req.body);
-  return sendResponse(res, {
-    statusCode: StatusCodes.CREATED,
-    success: true,
-    message: 'Admin created successfully',
-    data: result,
-  });
-});
+
 
 // PATCH /users/me
 const updateUser = catchAsync(async (req: Request, res: Response) => {
@@ -49,10 +40,20 @@ const updateUser = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// POST /users/admin
+// const createAdmin = catchAsync(async (req: Request, res: Response) => {
+//   const result = await UserService.createAdminToDB(req.body);
+//   return sendResponse(res, {
+//     statusCode: StatusCodes.CREATED,
+//     success: true,
+//     message: 'Admin created successfully',
+//     data: result,
+//   });
+// });
  
 export const UserController = {
   getUserProfile,
   createUser,
-  createAdmin,
   updateUser,
+  // createAdmin,
 };

@@ -1,9 +1,12 @@
 // src/app/modules/profile/profile.completion.ts
-import { IProfile } from './profile.interface';
+
+import { IProfile } from "../app/modules/profile/profile.interface";
+
+ 
 
 const WEIGHTS = {
   aboutMe: 5,
-  childAge: 5,
+  childDOB: 5,
   journeyName: 5,
   interests: 10,
   values: 5,
@@ -11,8 +14,8 @@ const WEIGHTS = {
   therapy: 10,
   location: 10,
   profilePicture: 10,
-  galleryPerPhoto: 2.5,   // 🔁 প্রতি ছবিতে ২.৫%
-  galleryMaxPhotos: 4,    // সর্বোচ্চ ৪টা → ১০%
+  galleryPerPhoto: 2.5,   
+  galleryMaxPhotos: 4, 
   consentAt: 15,
 } as const;
 
@@ -20,7 +23,7 @@ export function computeProfileCompletion(p: IProfile): number {
   let score = 0;
 
   if (p.aboutMe?.trim()) score += WEIGHTS.aboutMe;
-  if (typeof p.childAge === 'number' && p.childAge > 0) score += WEIGHTS.childAge;
+  if (p.childDOB) score += WEIGHTS.childDOB;
   if (p.journeyName?.trim()) score += WEIGHTS.journeyName;
   if ((p.interests?.length || 0) > 0) score += WEIGHTS.interests;
   if ((p.values?.length || 0) > 0) score += WEIGHTS.values;
@@ -34,13 +37,13 @@ export function computeProfileCompletion(p: IProfile): number {
 
   if (p.profilePicture?.url) score += WEIGHTS.profilePicture;
 
-  // 🔁 ইনক্রিমেন্টাল: প্রতি ছবিতে ২.৫%, সর্বোচ্চ ৪টা → ১০%
+  // per photo in gallery, incrementally up to max
   const gCount = Math.min(p.galleryPhotos?.length || 0, WEIGHTS.galleryMaxPhotos);
   score += gCount * WEIGHTS.galleryPerPhoto;
 
   if (p.consentAt) score += WEIGHTS.consentAt;
 
-  // one-decimal precision (যদি দরকার হয়)
+  // one-decimal precision  if needed
   score = Number(score.toFixed(1));
   if (score < 0) score = 0;
   if (score > 100) score = 100;

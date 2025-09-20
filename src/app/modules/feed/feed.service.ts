@@ -134,7 +134,7 @@ export const FeedService = {
 
     // new: add
 
-    // ✅ compute my child's age in months from DOB
+    // compute my child's age in months from DOB
     const myChildAgeMonths =
       myProf?.childDOB instanceof Date
         ? monthsBetween(myProf.childDOB)
@@ -164,7 +164,7 @@ export const FeedService = {
       ? journeyPrefMap[myJourneyName] ?? []
       : [];
 
-    // ✅ ADD HERE (before coordsOk / pipeline.push)
+    // ADD HERE (before coordsOk / pipeline.push)
     const myJourneyLower = myJourneyName ? myJourneyName.toLowerCase() : null;
     const prefTargetsLower = prefTargets.map((s) => s.toLowerCase());
     const myDiagNameLower = myDiagName ? myDiagName.toLowerCase() : null;
@@ -255,7 +255,7 @@ export const FeedService = {
       },
     });
 
-    // ✅ Stage A.1: candidate age in months from DOB (Mongo 5+: $dateDiff)
+    // Stage A.1: candidate age in months from DOB (Mongo 5+: $dateDiff)
     pipeline.push({
       $addFields: {
         candidateAgeMonths: {
@@ -360,7 +360,7 @@ pipeline.push({
           },
         },
 
-        // ✅ case-insensitive exact matches
+        // case-insensitive exact matches
         journeyScore: myJourneyLower
           ? { $cond: [{ $eq: ["$journeyNameLower", myJourneyLower] }, 1, 0] }
           : 0,
@@ -384,7 +384,7 @@ pipeline.push({
             }
           : 0,
 
-        // ✅ journey affinity (case-insensitive, non-exact)
+        // journey affinity (case-insensitive, non-exact)
         journeyAffinity: {
           $cond: [{ $in: ["$journeyNameLower", "$_prefTargetsLower"] }, 1, 0],
         },

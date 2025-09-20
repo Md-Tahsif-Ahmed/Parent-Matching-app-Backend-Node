@@ -50,25 +50,6 @@ const createUserToDB = async (payload: Partial<IUser>) => {
   return await User.findById(user._id).populate('profile');
 };
 
-const createAdminToDB = async (payload: Partial<IUser>) => {
-  if (!payload.email || !payload.password) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Email and password required');
-  }
-
-  const exists = await User.isExistUserByEmail(payload.email);
-  if (exists) throw new ApiError(StatusCodes.CONFLICT, 'This email already taken');
-
-  const user = new User({
-    email: payload.email,
-    password: payload.password,
-    name: payload.name,
-    role: USER_ROLES.ADMIN,
-    verified: true,
-  } as any);
-
-  await user.save();
-  return await User.findById(user._id);
-};
 
 const getMyProfileFromDB = async (userId: string | Types.ObjectId) => {
   const doc = await User.findById(userId).populate('profile');
@@ -94,9 +75,29 @@ const updateUserFromDB = async (userId: string, payload: Partial<IUser>) => {
   return updated;
 };
 
+// const createAdminToDB = async (payload: Partial<IUser>) => {
+//   if (!payload.email || !payload.password) {
+//     throw new ApiError(StatusCodes.BAD_REQUEST, 'Email and password required');
+//   }
+
+//   const exists = await User.isExistUserByEmail(payload.email);
+//   if (exists) throw new ApiError(StatusCodes.CONFLICT, 'This email already taken');
+
+//   const user = new User({
+//     email: payload.email,
+//     password: payload.password,
+//     name: payload.name,
+//     role: USER_ROLES.ADMIN,
+//     verified: true,
+//   } as any);
+
+//   await user.save();
+//   return await User.findById(user._id);
+// };
+
 export const UserService = {
   createUserToDB,
-  createAdminToDB,
   getMyProfileFromDB,
   updateUserFromDB,
+  // createAdminToDB,
 };

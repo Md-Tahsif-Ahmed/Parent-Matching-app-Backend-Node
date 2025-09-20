@@ -162,7 +162,7 @@ const uploadProfilePicture = async (
     size: file.size,
   };
 
-  // user profile খুঁজে বের করো (না থাকলে তৈরি করো)
+  // user profile  find
   let profile = await Profile.findOne({ user: userId });
 
   if (!profile) {
@@ -173,9 +173,9 @@ const uploadProfilePicture = async (
     return profile;
   }
 
-  // আগে যদি profilePicture থেকে থাকে—ফাইল unlink করো
+  // before if  profilePicture  unlink  
   if (profile.profilePicture?.url) {
-    unlinkFile(profile.profilePicture.url); // leading slash handle করে এমন unlinkFile ব্যবহার করো
+    unlinkFile(profile.profilePicture.url); // leading slash handle, use those type  unlinkFile  
   }
 
   profile.profilePicture = newMeta;
@@ -336,7 +336,6 @@ const deletePhoto = async (
     }
   }
 
-  profile.galleryPhotos.splice(index, 1);
   profile.completion = computeProfileCompletion(profile as any);
   await profile.save();
   return profile;

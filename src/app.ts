@@ -5,15 +5,8 @@ import { StatusCodes } from "http-status-codes";
 import router from "../src/app/routes";
 import globalErrorHandler from "./app/middlewares/globalErrorHandler";
 import session from "express-session";
-import { FeedRoutes } from "./app/modules/feed/feed.routes";
-import { MatchRoutes } from "./app/modules/match/match.routes";
-import { MessageRoutes } from "./app/modules/message/message.routes";
-import { ConversationRoutes } from "./app/modules/conversation/conversation.routes";
-import { BlockRoutes } from "./app/modules/block/block.routes";
 import path from "path";
-import { JourneyRoutes } from "./app/modules/journey/journey.route";
-import { TherapyRoutes } from "./app/modules/therapy/therapy.routes";
-import { DiagnosisRoutes } from "./app/modules/diagonosis/diagonosis.routes";
+
 const app = express();
 
 // morgan
@@ -35,7 +28,7 @@ app.use(
   express.static(UPLOAD_ROOT, {
     maxAge: "1y",
     etag: true,
-  
+
     setHeaders(res) {
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     },
@@ -58,14 +51,6 @@ app.use(
 
 //router
 app.use("/api/v1", router);
-app.use("/api/v1/feed", FeedRoutes);
-app.use("/api/v1/match", MatchRoutes);
-app.use("/api/v1/chat", MessageRoutes); // messages
-app.use("/api/v1/chat", ConversationRoutes); // list/recent/archive
-app.use("/api/v1/user", BlockRoutes);
-app.use("/api/v1/journey", JourneyRoutes);
-app.use("/api/v1/therapy", TherapyRoutes);
-app.use("api/v1/diagnosis", DiagnosisRoutes);
 
 app.get("/", (req: Request, res: Response) => {
   res.send("Hey Backend, How can I assist you ");
