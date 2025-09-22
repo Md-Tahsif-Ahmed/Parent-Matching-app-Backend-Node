@@ -1,8 +1,8 @@
 import { Document, Types } from "mongoose";
 
 export interface ISimpleKV {
-  typeName?: string; // dropdown group (optional)
-  name: string; // dropdown item OR free-text when "Others"
+  typeName: string;  
+  names: string[];
 }
 
 export interface IGeoPoint {
@@ -31,8 +31,8 @@ export interface IProfile extends Document {
   journeyName?: string;
   interests: string[];
   values: string[];
-  diagnosis?: ISimpleKV;
-  therapy?: ISimpleKV;
+  diagnoses?: ISimpleKV[];
+  therapies?: ISimpleKV[];
 
   completion?: number; // onboarding progress (0-100)
   consentAt?: Date;

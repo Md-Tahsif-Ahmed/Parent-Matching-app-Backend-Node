@@ -1,10 +1,12 @@
 // profile.validation.ts
 import { z } from "zod";
 
-const singleItemSchema = z.object({
-  typeName: z.string().min(1).optional(),
-  name: z.string().min(1),
+const ItemSchema = z.object({
+  typeName: z.string().trim().min(1).optional(),
+  names: z.array(z.string().trim().min(1)).min(1),
 });
+
+// const itemsArraySchema = z.array(ItemSchema).min(1);
 
 export const ProfileValidation = {
   // NEW: aboutMe only
@@ -41,12 +43,19 @@ export const ProfileValidation = {
       }),
   }),
 
-  // accept a single diagnosis / therapy item (allow both { item: {...} } and {...} directly)
-  setDiagnoses: z.object({
-    body: z.union([singleItemSchema, z.object({ item: singleItemSchema })]),
+setDiagnoses: z.object({
+    body: z.union([
+      ItemSchema,                              // { typeName?, names: [...] }
+      z.object({ group: ItemSchema }),         // { group: {...} }
+      z.array(ItemSchema).length(1),           // [ {...} ] ⇒  at least one item
+    ]),
   }),
   setTherapies: z.object({
-    body: z.union([singleItemSchema, z.object({ item: singleItemSchema })]),
+    body: z.union([
+      ItemSchema,
+      z.object({ group: ItemSchema }),
+      z.array(ItemSchema).length(1),
+    ]),
   }),
 
   setLocation: z.object({

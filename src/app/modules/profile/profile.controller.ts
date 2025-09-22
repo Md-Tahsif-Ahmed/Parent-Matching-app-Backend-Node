@@ -73,26 +73,33 @@ const setInterestsValues = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const setDiagnoses = catchAsync(async (req: Request, res: Response) => {
-  const bodyAny: any = req.body;
-  const item = bodyAny?.item ?? bodyAny;
-  const profile = await ProfileService.setDiagnoses((req as any).user.id, item);
+// profile.controller.ts (relevant parts)
+const normalizeSingleGroup = (body: any) => {
+  const group = Array.isArray(body) ? body[0] : body?.group ?? body;
+  return {
+    typeName: group.typeName ?? "Others",  // "Others" default if no typeName
+    names: Array.isArray(group.names) ? group.names : [],
+  };
+};
+
+export const setDiagnoses = catchAsync(async (req: Request, res: Response) => {
+  const group = normalizeSingleGroup(req.body);
+  const profile = await ProfileService.setDiagnosesSingle((req as any).user.id, group);
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: "Diagnosis updated",
+    message: "Diagnoses updated",
     data: profile,
   });
 });
 
-const setTherapies = catchAsync(async (req: Request, res: Response) => {
-  const bodyAny: any = req.body;
-  const item = bodyAny?.item ?? bodyAny;
-  const profile = await ProfileService.setTherapies((req as any).user.id, item);
+export const setTherapies = catchAsync(async (req: Request, res: Response) => {
+  const group = normalizeSingleGroup(req.body);
+  const profile = await ProfileService.setTherapiesSingle((req as any).user.id, group);
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: "Therapy updated",
+    message: "Therapies updated",
     data: profile,
   });
 });

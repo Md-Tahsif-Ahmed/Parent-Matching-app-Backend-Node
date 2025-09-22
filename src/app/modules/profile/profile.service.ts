@@ -45,7 +45,7 @@ const setChildDOB = async (userId: string, childDOB: Date) => {
   // basic guardrails
   const now = new Date();
   if (childDOB > now) {
-    throw new Error('childDOB cannot be in the future');
+    throw new Error("childDOB cannot be in the future");
   }
 
   const p = await Profile.findOneAndUpdate(
@@ -57,7 +57,6 @@ const setChildDOB = async (userId: string, childDOB: Date) => {
   // If you didn't enable virtuals, compute manually here and merge.
   return p;
 };
-
 
 const setJourney = async (userId: UserId, journeyName: string) => {
   const p = await Profile.findOneAndUpdate(
@@ -84,39 +83,70 @@ const setInterestsValues = async (
   return finalizeAndReturn(p);
 };
 
-const setDiagnoses = async (
-  userId: UserId,
-  item: { typeName?: string; name: string }
-) => {
-  if (!item || !item.name || item.name.trim().length === 0) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      "Diagnosis must contain a name"
-    );
-  }
-  const p = await Profile.findOneAndUpdate(
-    { user: userId },
-    { $set: { diagnosis: item } },
-    { new: true, upsert: true }
-  );
-  return finalizeAndReturn(p);
+const findGroupIndex = (arr: { typeName?: string; names: string[] }[], typeName?: string) => {
+  const key = (typeName ?? "").trim().toLowerCase();
+  return (arr || []).findIndex(g => (g.typeName ?? "").trim().toLowerCase() === key);
 };
 
-const setTherapies = async (
-  userId: UserId,
-  item: { typeName?: string; name: string }
-) => {
-  if (!item || !item.name || item.name.trim().length === 0) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, "Therapy must contain a name");
+export const setDiagnosesSingle = async (userId: UserId, group: { typeName?: string; names: string[] }): Promise<IProfile> => {
+  const typeName = group.typeName?.trim();      // may be undefined
+  const names = group.names.filter(Boolean);    // clean names (remove empty)
+  
+  if (names.length === 0) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, "names required");
   }
-  const p = await Profile.findOneAndUpdate(
-    { user: userId },
-    { $set: { therapy: item } },
-    { new: true, upsert: true }
-  );
-  return finalizeAndReturn(p);
+
+  let profile = await Profile.findOne({ user: userId });
+  if (!profile) {
+    profile = await Profile.create({
+      user: userId,
+      diagnoses: [{ typeName: typeName ?? "Others", names }], // default "Others" if typeName missing
+    } as Partial<IProfile>);
+    return profile;
+  }
+
+  if (!profile.diagnoses) profile.diagnoses = [];
+  const idx = findGroupIndex(profile.diagnoses, typeName);
+  if (idx >= 0) {
+    profile.diagnoses[idx].names = names; // replace names for that type (or no-type)
+  } else {
+    profile.diagnoses.push({ typeName: typeName ?? "Others", names });
+  }
+
+  profile.completion = computeProfileCompletion(profile as any);
+  await profile.save();
+  return profile;
 };
 
+export const setTherapiesSingle = async (userId: UserId, group: { typeName?: string; names: string[] }): Promise<IProfile> => {
+  const typeName = group.typeName?.trim();  // optional
+  const names = group.names.filter(Boolean);
+
+  if (names.length === 0) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, "names required");
+  }
+
+  let profile = await Profile.findOne({ user: userId });
+  if (!profile) {
+    profile = await Profile.create({
+      user: userId,
+      therapies: [{ typeName: typeName ?? "Others", names }],
+    } as Partial<IProfile>);
+    return profile;
+  }
+
+  if (!profile.therapies) profile.therapies = [];
+  const idx = findGroupIndex(profile.therapies, typeName);
+  if (idx >= 0) {
+    profile.therapies[idx].names = names;
+  } else {
+    profile.therapies.push({ typeName: typeName ?? "Others", names });
+  }
+
+  profile.completion = computeProfileCompletion(profile as any);
+  await profile.save();
+  return profile;
+};
 const setLocation = async (
   userId: UserId,
   lat: number,
@@ -173,9 +203,9 @@ const uploadProfilePicture = async (
     return profile;
   }
 
-  // before if  profilePicture  unlink  
+  // before if  profilePicture  unlink
   if (profile.profilePicture?.url) {
-    unlinkFile(profile.profilePicture.url); // leading slash handle, use those type  unlinkFile  
+    unlinkFile(profile.profilePicture.url); // leading slash handle, use those type  unlinkFile
   }
 
   profile.profilePicture = newMeta;
