@@ -4,48 +4,52 @@ import { IFaq } from './faq.interface';
 import { Faq } from './faq.model';
 import mongoose from 'mongoose';
 
-
 const createFaqToDB = async (payload: IFaq): Promise<IFaq> => {
-    const faq = await Faq.create(payload);
-    if (!faq) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to created Faq');
-    }
-  
-    return faq;
+  const faqDoc = await Faq.create(payload);
+  if (!faqDoc) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create Faq');
+  }
+
+  return faqDoc.toObject() as IFaq;
 };
 
 const faqsFromDB = async (): Promise<IFaq[]> => {
-    const faqs = await Faq.find({});
-    return faqs;
+  const faqs = await Faq.find({}).lean<IFaq[]>();
+  return faqs;
 };
-  
-const deleteFaqToDB = async (id: string): Promise<IFaq | undefined> => {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid ID');
-    }
-  
-    await Faq.findByIdAndDelete(id);
-    return;
+
+const deleteFaqToDB = async (id: string): Promise<void> => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid ID');
+  }
+
+  const deleted = await Faq.findByIdAndDelete(id);
+  if (!deleted) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Faq not found');
+  }
 };
-  
-const updateFaqToDB = async (id: string, payload: IFaq): Promise<IFaq> => {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid ID');
-    }
-  
-    const updatedFaq = await Faq.findByIdAndUpdate({ _id: id }, payload, {
-      new: true,
-    });
-    if (!updatedFaq) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to updated Faq');
-    }
-  
-    return updatedFaq;
+
+const updateFaqToDB = async (id: string, payload: Partial<IFaq>): Promise<IFaq> => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid ID');
+  }
+
+  const updated = await Faq.findByIdAndUpdate(
+    id,
+    { $set: payload },
+    { new: true, runValidators: true }
+  );
+
+  if (!updated) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Faq not found');
+  }
+
+  return updated.toObject() as IFaq;
 };
-  
+
 export const FaqService = {
-    createFaqToDB,
-    updateFaqToDB,
-    faqsFromDB,
-    deleteFaqToDB,
-};  
+  createFaqToDB,
+  updateFaqToDB,
+  faqsFromDB,
+  deleteFaqToDB,
+};

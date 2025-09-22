@@ -9,15 +9,12 @@ const router = express.Router();
 router
     .route('/')
     .post(
-        validateRequest(FaqValidation.createFaqZodSchema),
         auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
+        validateRequest(FaqValidation.createFaqZodSchema),
+        
         FaqController.createFaq
     )
     .get(
-        auth(
-            USER_ROLES.SUPER_ADMIN,
-            USER_ROLES.ADMIN
-        ),
         FaqController.getFaqs
     );
 
@@ -29,6 +26,7 @@ router
     )
     .patch(
         auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
+        validateRequest(FaqValidation.updateFaqZodSchema),
         FaqController.updateFaq
     );
 

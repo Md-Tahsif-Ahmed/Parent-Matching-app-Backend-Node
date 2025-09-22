@@ -12,6 +12,10 @@ import { BlockRoutes } from '../modules/block/block.routes';
 import { JourneyRoutes } from '../modules/journey/journey.route';
 import { TherapyRoutes } from '../modules/therapy/therapy.routes';
 import { DiagnosisRoutes } from '../modules/diagonosis/diagonosis.routes';
+import { FaqRoutes } from '../modules/faq/faq.route';
+import { AboutUsRoutes } from '../modules/about/about-us.route';
+import { PrivacyRoutes } from '../modules/privacy/privacy-policy.route';
+import { TermsAndConditionsRoutes } from '../modules/terms/terms-and-conditions.route';
 const router = express.Router();
 
 const apiRoutes = [
@@ -28,6 +32,12 @@ const apiRoutes = [
   { path: "/journey", route: JourneyRoutes },
   { path: "/therapy", route: TherapyRoutes },
   { path: "/diagnosis", route: DiagnosisRoutes }, 
+  { path: "/faq", route: FaqRoutes },
+  { path: "/about", route: AboutUsRoutes },
+  { path: "/privacy", route: PrivacyRoutes },
+  { path: "/terms", route: TermsAndConditionsRoutes },
+
+
 ];
 
 
